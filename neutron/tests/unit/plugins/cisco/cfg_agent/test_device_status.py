@@ -120,7 +120,6 @@ class TestHostingDevice(base.BaseTestCase):
         self.assertEqual(self.status.backlog_hosting_devices[123]['hd'],
                          self.hosting_device)
 
-
     def test_test_is_hosting_device_reachable_negative_exisiting_hd(self):
         self.status.backlog_hosting_devices.clear()
         self.status.backlog_hosting_devices[123] = {'hd': self.hosting_device}
