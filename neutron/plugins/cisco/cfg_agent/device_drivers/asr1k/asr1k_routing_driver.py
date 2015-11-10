@@ -364,8 +364,7 @@ class ASR1kRoutingDriver(iosxe_driver.IosXeRoutingDriver):
 
     @staticmethod
     def _port_is_hsrp(port):
-        hsrp_types = [constants.DEVICE_OWNER_ROUTER_HA_GW,
-                      constants.DEVICE_OWNER_ROUTER_HA_INTF]
+        hsrp_types = [constants.DEVICE_OWNER_ROUTER_HA_INTF]
         return port['device_owner'] in hsrp_types
 
     @staticmethod
