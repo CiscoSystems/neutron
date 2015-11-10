@@ -16,6 +16,7 @@
 import copy
 import functools
 import os.path
+import time
 
 import mock
 import netaddr
@@ -53,6 +54,7 @@ LOG = logging.getLogger(__name__)
 _uuid = uuidutils.generate_uuid
 
 METADATA_REQUEST_TIMEOUT = 60
+METADATA_REQUEST_SLEEP = 5
 
 
 def get_ovs_bridge(br_name):
@@ -404,11 +406,17 @@ class L3AgentTestCase(L3AgentTestFramework):
     def test_ha_router_lifecycle(self):
         self._router_lifecycle(enable_ha=True)
 
-    def test_conntrack_disassociate_fip(self):
+    def test_conntrack_disassociate_fip_legacy_router(self):
+        self._test_conntrack_disassociate_fip(ha=False)
+
+    def test_conntrack_disassociate_fip_ha_router(self):
+        self._test_conntrack_disassociate_fip(ha=True)
+
+    def _test_conntrack_disassociate_fip(self, ha):
         '''Test that conntrack immediately drops stateful connection
            that uses floating IP once it's disassociated.
         '''
-        router_info = self.generate_router_info(enable_ha=False)
+        router_info = self.generate_router_info(enable_ha=ha)
         router = self.manage_router(self.agent, router_info)
 
         port = helpers.get_free_namespace_port(router.ns_name)
@@ -435,6 +443,9 @@ class L3AgentTestCase(L3AgentTestFramework):
                                            "--orig-src", client_address])
             self.assertEqual(
                 n, len([line for line in out.strip().split('\n') if line]))
+
+        if ha:
+            utils.wait_until_true(lambda: router.ha_state == 'master')
 
         with self.assert_max_execution_time(100):
             assert_num_of_conntrack_rules(0)
@@ -887,6 +898,28 @@ class MetadataL3AgentTestCase(L3AgentTestFramework):
                      self.agent.conf.metadata_proxy_socket,
                      workers=0, backlog=4096, mode=self.SOCKET_MODE)
 
+    def _query_metadata_proxy(self, client_ns):
+        url = 'http://%(host)s:%(port)s' % {'host': dhcp.METADATA_DEFAULT_IP,
+                                            'port': dhcp.METADATA_PORT}
+        cmd = 'curl', '--max-time', METADATA_REQUEST_TIMEOUT, '-D-', url
+        i = 0
+        CONNECTION_REFUSED_TIMEOUT = METADATA_REQUEST_TIMEOUT // 2
+        while i <= CONNECTION_REFUSED_TIMEOUT:
+            try:
+                raw_headers = client_ns.netns.execute(cmd)
+                break
+            except RuntimeError as e:
+                if 'Connection refused' in str(e):
+                    time.sleep(METADATA_REQUEST_SLEEP)
+                    i += METADATA_REQUEST_SLEEP
+                else:
+                    self.fail('metadata proxy unreachable '
+                              'on %s before timeout' % url)
+
+        if i > CONNECTION_REFUSED_TIMEOUT:
+            self.fail('Timed out waiting metadata proxy to become available')
+        return raw_headers.splitlines()[0]
+
     def test_access_to_metadata_proxy(self):
         """Test access to the l3-agent metadata proxy.
 
@@ -921,16 +954,9 @@ class MetadataL3AgentTestCase(L3AgentTestFramework):
                                           router_ip_cidr.partition('/')[0])
 
         # Query metadata proxy
-        url = 'http://%(host)s:%(port)s' % {'host': dhcp.METADATA_DEFAULT_IP,
-                                            'port': dhcp.METADATA_PORT}
-        cmd = 'curl', '--max-time', METADATA_REQUEST_TIMEOUT, '-D-', url
-        try:
-            raw_headers = client_ns.netns.execute(cmd)
-        except RuntimeError:
-            self.fail('metadata proxy unreachable on %s before timeout' % url)
+        firstline = self._query_metadata_proxy(client_ns)
 
         # Check status code
-        firstline = raw_headers.splitlines()[0]
         self.assertIn(str(webob.exc.HTTPOk.code), firstline.split())
 
 

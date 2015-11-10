@@ -867,7 +867,8 @@ class TestIpNetnsCommand(TestIPCmdBase):
             execute.assert_called_once_with(
                 ['ip', 'netns', 'exec', 'ns',
                  'sysctl', '-w', 'net.ipv4.conf.all.promote_secondaries=1'],
-                run_as_root=True, check_exit_code=True, extra_ok_codes=None)
+                run_as_root=True, check_exit_code=True, extra_ok_codes=None,
+                log_fail_as_error=True)
 
     def test_delete_namespace(self):
         with mock.patch('neutron.agent.common.utils.execute'):
@@ -908,7 +909,8 @@ class TestIpNetnsCommand(TestIPCmdBase):
                                              'link', 'list'],
                                             run_as_root=True,
                                             check_exit_code=True,
-                                            extra_ok_codes=None)
+                                            extra_ok_codes=None,
+                                            log_fail_as_error=True)
 
     def test_execute_env_var_prepend(self):
         self.parent.namespace = 'ns'
@@ -919,7 +921,8 @@ class TestIpNetnsCommand(TestIPCmdBase):
                 ['ip', 'netns', 'exec', 'ns', 'env'] +
                 ['%s=%s' % (k, v) for k, v in env.items()] +
                 ['ip', 'link', 'list'],
-                run_as_root=True, check_exit_code=True, extra_ok_codes=None)
+                run_as_root=True, check_exit_code=True, extra_ok_codes=None,
+                log_fail_as_error=True)
 
     def test_execute_nosudo_with_no_namespace(self):
         with mock.patch('neutron.agent.common.utils.execute') as execute:
@@ -928,7 +931,8 @@ class TestIpNetnsCommand(TestIPCmdBase):
             execute.assert_called_once_with(['test'],
                                             check_exit_code=True,
                                             extra_ok_codes=None,
-                                            run_as_root=False)
+                                            run_as_root=False,
+                                            log_fail_as_error=True)
 
 
 class TestDeviceExists(base.BaseTestCase):
@@ -980,13 +984,18 @@ class TestIpNeighCommand(TestIPCmdBase):
 
 
 class TestArpPing(TestIPCmdBase):
-    def _test_arping(self, function, address, spawn_n, mIPWrapper):
+    @mock.patch.object(ip_lib, 'IPWrapper')
+    @mock.patch('eventlet.spawn_n')
+    def test_send_ipv4_addr_adv_notif(self, spawn_n, mIPWrapper):
         spawn_n.side_effect = lambda f: f()
         ARPING_COUNT = 3
-        function(mock.sentinel.ns_name,
-                 mock.sentinel.iface_name,
-                 address,
-                 ARPING_COUNT)
+        address = '20.0.0.1'
+        config = mock.Mock()
+        config.send_arp_for_ha = ARPING_COUNT
+        ip_lib.send_ip_addr_adv_notif(mock.sentinel.ns_name,
+                                      mock.sentinel.iface_name,
+                                      address,
+                                      config)
 
         self.assertTrue(spawn_n.called)
         mIPWrapper.assert_called_once_with(namespace=mock.sentinel.ns_name)
@@ -1002,43 +1011,16 @@ class TestArpPing(TestIPCmdBase):
         ip_wrapper.netns.execute.assert_any_call(arping_cmd,
                                                  check_exit_code=True)
 
-    @mock.patch.object(ip_lib, 'IPWrapper')
     @mock.patch('eventlet.spawn_n')
-    def test_send_gratuitous_arp(self, spawn_n, mIPWrapper):
-        self._test_arping(
-            ip_lib.send_gratuitous_arp, '20.0.0.1', spawn_n, mIPWrapper)
-
-    @mock.patch.object(ip_lib, 'IPDevice')
-    @mock.patch.object(ip_lib, 'IPWrapper')
-    @mock.patch('eventlet.spawn_n')
-    def test_send_garp_for_proxy_arp(self, spawn_n, mIPWrapper, mIPDevice):
-        addr = '20.0.0.1'
-        ip_wrapper = mIPWrapper(namespace=mock.sentinel.ns_name)
-        mIPWrapper.reset_mock()
-        device = mIPDevice(mock.sentinel.iface_name,
-                           namespace=mock.sentinel.ns_name)
-        mIPDevice.reset_mock()
-
-        # Check that the address was added to the interface before arping
-        def check_added_address(*args, **kwargs):
-            mIPDevice.assert_called_once_with(mock.sentinel.iface_name,
-                                              namespace=mock.sentinel.ns_name)
-            device.addr.add.assert_called_once_with(addr + '/32')
-            self.assertFalse(device.addr.delete.called)
-            device.addr.reset_mock()
-
-        ip_wrapper.netns.execute.side_effect = check_added_address
-
-        self._test_arping(
-            ip_lib.send_garp_for_proxyarp, addr, spawn_n, mIPWrapper)
-
-        # Test that the address was removed after arping
-        device = mIPDevice(mock.sentinel.iface_name,
-                           namespace=mock.sentinel.ns_name)
-        device.addr.delete.assert_called_once_with(addr + '/32')
-
-        # If this was called then check_added_address probably had a assert
-        self.assertFalse(device.addr.add.called)
+    def test_no_ipv6_addr_notif(self, spawn_n):
+        ipv6_addr = 'fd00::1'
+        config = mock.Mock()
+        config.send_arp_for_ha = 3
+        ip_lib.send_ip_addr_adv_notif(mock.sentinel.ns_name,
+                                      mock.sentinel.iface_name,
+                                      ipv6_addr,
+                                      config)
+        self.assertFalse(spawn_n.called)
 
 
 class TestAddNamespaceToCmd(base.BaseTestCase):

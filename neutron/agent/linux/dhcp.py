@@ -477,6 +477,9 @@ class Dnsmasq(DhcpLocalProcess):
                     # an IPv6 address because of stateless DHCPv6 network.
             host_name,  # Host name.
             name,  # Canonical hostname in the format 'hostname[.domain]'.
+            no_dhcp,  # A flag indicating that the address doesn't need a DHCP
+                      # IP address.
+            no_opts,  # A flag indication that options shouldn't be written
         )
         """
         v6_nets = dict((subnet.id, subnet) for subnet in
@@ -486,24 +489,22 @@ class Dnsmasq(DhcpLocalProcess):
             fixed_ips = self._sort_fixed_ips_for_dnsmasq(port.fixed_ips,
                                                          v6_nets)
             for alloc in fixed_ips:
-                # Note(scollins) Only create entries that are
-                # associated with the subnet being managed by this
-                # dhcp agent
+                no_dhcp = False
+                no_opts = False
                 if alloc.subnet_id in v6_nets:
                     addr_mode = v6_nets[alloc.subnet_id].ipv6_address_mode
-                    if addr_mode == constants.IPV6_SLAAC:
-                        continue
-                    elif addr_mode == constants.DHCPV6_STATELESS:
-                        alloc = hostname = fqdn = None
-                        yield (port, alloc, hostname, fqdn)
-                        continue
+                    no_dhcp = addr_mode in (constants.IPV6_SLAAC,
+                                            constants.DHCPV6_STATELESS)
+                    # we don't setup anything for SLAAC. It doesn't make sense
+                    # to provide options for a client that won't use DHCP
+                    no_opts = addr_mode == constants.IPV6_SLAAC
 
                 hostname = 'host-%s' % alloc.ip_address.replace(
                     '.', '-').replace(':', '-')
                 fqdn = hostname
                 if self.conf.dhcp_domain:
                     fqdn = '%s.%s' % (fqdn, self.conf.dhcp_domain)
-                yield (port, alloc, hostname, fqdn)
+                yield (port, alloc, hostname, fqdn, no_dhcp, no_opts)
 
     def _output_init_lease_file(self):
         """Write a fake lease file to bootstrap dnsmasq.
@@ -532,9 +533,11 @@ class Dnsmasq(DhcpLocalProcess):
             timestamp = int(time.time()) + self.conf.dhcp_lease_duration
         dhcp_enabled_subnet_ids = [s.id for s in self.network.subnets
                                    if s.enable_dhcp]
-        for (port, alloc, hostname, name) in self._iter_hosts():
-            # don't write ip address which belongs to a dhcp disabled subnet.
-            if not alloc or alloc.subnet_id not in dhcp_enabled_subnet_ids:
+        for host_tuple in self._iter_hosts():
+            port, alloc, hostname, name, no_dhcp, no_opts = host_tuple
+            # don't write ip address which belongs to a dhcp disabled subnet
+            # or an IPv6 SLAAC/stateless subnet
+            if no_dhcp or alloc.subnet_id not in dhcp_enabled_subnet_ids:
                 continue
 
             ip_address = self._format_address_for_dnsmasq(alloc.ip_address)
@@ -581,9 +584,10 @@ class Dnsmasq(DhcpLocalProcess):
                                    if s.enable_dhcp]
         # NOTE(ihrachyshka): the loop should not log anything inside it, to
         # avoid potential performance drop when lots of hosts are dumped
-        for (port, alloc, hostname, name) in self._iter_hosts():
-            if not alloc:
-                if getattr(port, 'extra_dhcp_opts', False):
+        for host_tuple in self._iter_hosts():
+            port, alloc, hostname, name, no_dhcp, no_opts = host_tuple
+            if no_dhcp:
+                if not no_opts and getattr(port, 'extra_dhcp_opts', False):
                     buf.write('%s,%s%s\n' %
                               (port.mac_address, 'set:', port.id))
                 continue
@@ -639,7 +643,8 @@ class Dnsmasq(DhcpLocalProcess):
         file.
         """
         buf = six.StringIO()
-        for (port, alloc, hostname, fqdn) in self._iter_hosts():
+        for host_tuple in self._iter_hosts():
+            port, alloc, hostname, fqdn, no_dhcp, no_opts = host_tuple
             # It is compulsory to write the `fqdn` before the `hostname` in
             # order to obtain it in PTR responses.
             if alloc:
@@ -664,10 +669,10 @@ class Dnsmasq(DhcpLocalProcess):
             subnet_to_interface_ip = self._make_subnet_interface_ip_map()
         isolated_subnets = self.get_isolated_subnets(self.network)
         for i, subnet in enumerate(self.network.subnets):
+            addr_mode = getattr(subnet, 'ipv6_address_mode', None)
             if (not subnet.enable_dhcp or
                 (subnet.ip_version == 6 and
-                 getattr(subnet, 'ipv6_address_mode', None)
-                 in [None, constants.IPV6_SLAAC])):
+                 addr_mode == constants.IPV6_SLAAC)):
                 continue
             if subnet.dns_nameservers:
                 options.append(
@@ -1067,7 +1072,10 @@ class DeviceManager(object):
 
     def destroy(self, network, device_name):
         """Destroy the device used for the network's DHCP on this host."""
-        self.driver.unplug(device_name, namespace=network.namespace)
+        if device_name:
+            self.driver.unplug(device_name, namespace=network.namespace)
+        else:
+            LOG.debug('No interface exists for network %s', network.id)
 
         self.plugin.release_dhcp_port(network.id,
                                       self.get_device_id(network))

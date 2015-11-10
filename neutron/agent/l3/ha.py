@@ -117,13 +117,14 @@ class AgentMixin(object):
 
         try:
             ri = self.router_info[router_id]
-        except AttributeError:
+        except KeyError:
             LOG.info(_LI('Router %s is not managed by this agent. It was '
                          'possibly deleted concurrently.'), router_id)
             return
 
         self._configure_ipv6_ra_on_ext_gw_port_if_necessary(ri, state)
-        self._update_metadata_proxy(ri, router_id, state)
+        if self.conf.enable_metadata_proxy:
+            self._update_metadata_proxy(ri, router_id, state)
         self._update_radvd_daemon(ri, state)
         self.state_change_notifier.queue_event((router_id, state))
 

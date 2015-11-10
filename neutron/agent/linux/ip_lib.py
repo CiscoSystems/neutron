@@ -564,7 +564,8 @@ class IpNetnsCommand(IpCommandBase):
         self._as_root([], ('delete', name), use_root_namespace=True)
 
     def execute(self, cmds, addl_env=None, check_exit_code=True,
-                extra_ok_codes=None, run_as_root=False):
+                log_fail_as_error=True, extra_ok_codes=None,
+                run_as_root=False):
         ns_params = []
         kwargs = {'run_as_root': run_as_root}
         if self._parent.namespace:
@@ -577,7 +578,8 @@ class IpNetnsCommand(IpCommandBase):
                           ['%s=%s' % pair for pair in addl_env.items()])
         cmd = ns_params + env_params + list(cmds)
         return utils.execute(cmd, check_exit_code=check_exit_code,
-                             extra_ok_codes=extra_ok_codes, **kwargs)
+                             extra_ok_codes=extra_ok_codes,
+                             log_fail_as_error=log_fail_as_error, **kwargs)
 
     def exists(self, name):
         output = self._parent._execute(
@@ -682,38 +684,24 @@ def _arping(ns_name, iface_name, address, count):
                             'ns': ns_name})
 
 
-def send_gratuitous_arp(ns_name, iface_name, address, count):
-    """Send a gratuitous arp using given namespace, interface, and address."""
+def send_ip_addr_adv_notif(ns_name, iface_name, address, config):
+    """Send advance notification of an IP address assignment.
+
+    If the address is in the IPv4 family, send gratuitous ARP.
+
+    If the address is in the IPv6 family, no advance notification is
+    necessary, since the Neighbor Discovery Protocol (NDP), Duplicate
+    Address Discovery (DAD), and (for stateless addresses) router
+    advertisements (RAs) are sufficient for address resolution and
+    duplicate address detection.
+    """
+    count = config.send_arp_for_ha
 
     def arping():
         _arping(ns_name, iface_name, address, count)
 
-    if count > 0:
+    if count > 0 and netaddr.IPAddress(address).version == 4:
         eventlet.spawn_n(arping)
-
-
-def send_garp_for_proxyarp(ns_name, iface_name, address, count):
-    """
-    Send a gratuitous arp using given namespace, interface, and address
-
-    This version should be used when proxy arp is in use since the interface
-    won't actually have the address configured.  We actually need to configure
-    the address on the interface and then remove it when the proxy arp has been
-    sent.
-    """
-    def arping_with_temporary_address():
-        # Configure the address on the interface
-        device = IPDevice(iface_name, namespace=ns_name)
-        net = netaddr.IPNetwork(str(address))
-        device.addr.add(str(net))
-
-        _arping(ns_name, iface_name, address, count)
-
-        # Delete the address from the interface
-        device.addr.delete(str(net))
-
-    if count > 0:
-        eventlet.spawn_n(arping_with_temporary_address)
 
 
 def add_namespace_to_cmd(cmd, namespace=None):
