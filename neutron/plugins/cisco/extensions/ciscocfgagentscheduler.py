@@ -30,6 +30,8 @@ from neutron.plugins.cisco.extensions import ciscohostingdevicemanager
 from neutron import policy
 from neutron import wsgi
 
+PATH_PREFIX = "/dev_mgr"
+
 LOG = logging.getLogger(__name__)
 
 
@@ -160,7 +162,8 @@ class Ciscocfgagentscheduler(extensions.ExtensionDescriptor):
         controller = resource.Resource(
             CfgAgentsHandlingHostingDeviceController(), base.FAULT_MAP)
         exts.append(extensions.ResourceExtension(HOSTING_DEVICE_CFG_AGENTS,
-                                                 controller, parent))
+                                                 controller, parent,
+                                                 PATH_PREFIX))
         return exts
 
     def get_extended_resources(self, version):
