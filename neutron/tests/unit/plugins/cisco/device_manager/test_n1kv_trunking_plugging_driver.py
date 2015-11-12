@@ -58,7 +58,7 @@ class TestN1kvTrunkingPluggingDriver(
         # hosting devices and routertypes there
         self._add_device_manager_plugin_ini_file()
         self._add_router_plugin_ini_file()
-        #TODO(bobmel): Fix bug in test_extensions.py and we can remove the
+        # TODO(bobmel): Fix bug in test_extensions.py and we can remove the
         # below call to setup_config()
         self.setup_config()
 
@@ -94,6 +94,34 @@ class TestN1kvTrunkingPluggingDriver(
                                                'profile', 'the_profile')
         self.assertEqual(p_id, None)
 
+    def test__get_network_profile_id(self):
+        if self.test_driver == N1kvTrunkingPlugDriver:
+            m1 = mock.MagicMock(return_value=[{'id': 'profile_uuid1'}])
+            self.core_plugin.get_network_profiles = m1
+            plugging_driver = self.test_driver()
+            p_id = plugging_driver._get_profile_id(
+                'net_profile', 'net profile', 'the_profile')
+            self.assertEqual(p_id, 'profile_uuid1')
+
+    def test__get_network_profile_id_multiple_match(self):
+        if self.test_driver == N1kvTrunkingPlugDriver:
+            m1 = mock.MagicMock(return_value=[{'id': 'profile_uuid1'},
+                                              {'id': 'profile_uuid2'}])
+            self.core_plugin.get_network_profiles = m1
+            plugging_driver = self.test_driver()
+            p_id = plugging_driver._get_profile_id(
+                'net_profile', 'net profile', 'the_profile')
+            self.assertEqual(p_id, None)
+
+    def test__get_network_profile_id_no_match(self):
+        if self.test_driver == N1kvTrunkingPlugDriver:
+            m1 = mock.MagicMock(return_value=[])
+            self.core_plugin.get_network_profiles = m1
+            plugging_driver = self.test_driver()
+            p_id = plugging_driver._get_profile_id(
+                'net_profile', 'net profile', 'the_profile')
+            self.assertEqual(p_id, None)
+
     def test_create_hosting_device_resources(self):
 
         def _verify_resource_name(res_list, resource_prefix, num):
@@ -120,11 +148,12 @@ class TestN1kvTrunkingPluggingDriver(
         res = plugging_driver.create_hosting_device_resources(
             ctx, "some_id", tenant_id, mgmt_context, 2)
         self.assertIsNotNone(res['mgmt_port'])
-        self.assertEqual(len(res['networks']), 4)
-        self.assertEqual(len(res['subnets']), 4)
+        if self.test_driver == N1kvTrunkingPlugDriver:
+            self.assertEqual(len(res['networks']), 4)
+            self.assertEqual(len(res['subnets']), 4)
+            _verify_resource_name(res['networks'], 'net', 2)
+            _verify_resource_name(res['subnets'], 'subnet', 2)
         self.assertEqual(len(res['ports']), 4)
-        _verify_resource_name(res['networks'], 'n:', 2)
-        _verify_resource_name(res['subnets'], 'sn:', 2)
         _verify_resource_name(res['ports'], 'p:', 2)
 
     def test_create_hosting_device_resources_no_mgmt_context(self):
@@ -140,56 +169,10 @@ class TestN1kvTrunkingPluggingDriver(
         res = plugging_driver.create_hosting_device_resources(
             ctx, "some_id", tenant_id, None, 2)
         self.assertIsNone(res['mgmt_port'], res)
-        self.assertEqual(len(res['networks']), 0)
-        self.assertEqual(len(res['subnets']), 0)
-        self.assertEqual(len(res['ports']), 0)
-
-    def test__create_resources(self):
-        plugging_driver = self.test_driver()
-        tenant_id = 'tenant_uuid1'
-        ctx = context.Context('', tenant_id, is_admin=True)
-        n_spec = {'network': {
-            'tenant_id': tenant_id,
-            'admin_state_up': True,
-            'name': n1kv_const.T1_NETWORK_NAME,
-            'shared': False}}
-        s_spec = {'subnet': {
-            'tenant_id': tenant_id,
-            'admin_state_up': True,
-            'cidr': n1kv_const.SUBNET_PREFIX,
-            'enable_dhcp': False,
-            'gateway_ip': attributes.ATTR_NOT_SPECIFIED,
-            'allocation_pools': attributes.ATTR_NOT_SPECIFIED,
-            'ip_version': 4,
-            'dns_nameservers': attributes.ATTR_NOT_SPECIFIED,
-            'host_routes': attributes.ATTR_NOT_SPECIFIED}}
-        p_spec = {'port': {
-            'tenant_id': tenant_id,
-            'admin_state_up': True,
-            'name': 'mgmt',
-            'mac_address': attributes.ATTR_NOT_SPECIFIED,
-            'fixed_ips': attributes.ATTR_NOT_SPECIFIED,
-            'n1kv:profile_id': 'profile_uuid',
-            'device_id': "",
-            # Use device_owner attribute to ensure we can query for these
-            # ports even before Nova has set device_id attribute.
-            'device_owner': "some_id"}}
-        t1_n, t1_sn, t1_p = [], [], []
         if self.test_driver == N1kvTrunkingPlugDriver:
-            plugging_driver._create_resources(
-                ctx, 'T1', 0, n_spec, 't1_n:', 'net_profile_id', t1_n,
-                s_spec, 't1_sn:', t1_sn, p_spec, 't1_p:', 'profile_id', t1_p)
-        else:
-            plugging_driver._create_resources(
-                ctx, 'T1', 0, n_spec, 't1_n:', t1_n, s_spec, 't1_sn:', t1_sn,
-                p_spec, 't1_p:', 'profile_id', t1_p)
-        self.assertEqual(len(t1_n), 1)
-        self.assertEqual(t1_n[0]['name'], 't1_n:1')
-        self.assertEqual(len(t1_sn), 1)
-        self.assertEqual(t1_sn[0]['name'], 't1_sn:1')
-        self.assertEqual(len(t1_p), 1)
-        self.assertEqual(t1_p[0]['name'], 't1_p:1')
-        self.assertEqual(t1_p[0]['device_owner'], 'some_id')
+            self.assertEqual(len(res['networks']), 0)
+            self.assertEqual(len(res['subnets']), 0)
+        self.assertEqual(len(res['ports']), 0)
 
     def test_get_hosting_device_resources_by_complementary_id(self):
         m1 = mock.MagicMock(return_value=[{'id': 'profile_uuid1'}])
@@ -211,10 +194,11 @@ class TestN1kvTrunkingPluggingDriver(
                 ctx, '', 'some_id', tenant_id, osn_subnet['network_id'])
             self.assertEqual(res_get['mgmt_port']['id'],
                              res['mgmt_port']['id'])
-            self.assertEqual({i['id'] for i in res['networks']},
-                             {i['id'] for i in res_get['networks']})
-            self.assertEqual({i['id'] for i in res['subnets']},
-                             {i['id'] for i in res_get['subnets']})
+            if self.test_driver == N1kvTrunkingPlugDriver:
+                self.assertEqual({i['id'] for i in res['networks']},
+                                 {i['id'] for i in res_get['networks']})
+                self.assertEqual({i['id'] for i in res['subnets']},
+                                 {i['id'] for i in res_get['subnets']})
             self.assertEqual({i['id'] for i in res['ports']},
                              {i['id'] for i in res_get['ports']})
 
@@ -246,10 +230,11 @@ class TestN1kvTrunkingPluggingDriver(
                 ctx, hd_uuid, 'some_id', tenant_id, osn_subnet['network_id'])
             self.assertEqual(res_get['mgmt_port']['id'],
                              res['mgmt_port']['id'])
-            self.assertEqual({i['id'] for i in res['networks']},
-                             {i['id'] for i in res_get['networks']})
-            self.assertEqual({i['id'] for i in res['subnets']},
-                             {i['id'] for i in res_get['subnets']})
+            if self.test_driver == N1kvTrunkingPlugDriver:
+                self.assertEqual({i['id'] for i in res['networks']},
+                                 {i['id'] for i in res_get['networks']})
+                self.assertEqual({i['id'] for i in res['subnets']},
+                                 {i['id'] for i in res_get['subnets']})
             self.assertEqual({i['id'] for i in res['ports']},
                              {i['id'] for i in res_get['ports']})
 
@@ -267,9 +252,13 @@ class TestN1kvTrunkingPluggingDriver(
         res = plugging_driver.create_hosting_device_resources(
             ctx, "some_id", tenant_id, mgmt_context, 2)
         nets = self._list('networks')
-        self.assertEqual(len(nets['networks']), 5)
         subnets = self._list('subnets')
-        self.assertEqual(len(subnets['subnets']), 5)
+        if self.test_driver == N1kvTrunkingPlugDriver:
+            self.assertEqual(len(nets['networks']), 5)
+            self.assertEqual(len(subnets['subnets']), 5)
+        else:
+            self.assertEqual(len(nets['networks']), 3)
+            self.assertEqual(len(subnets['subnets']), 3)
         ports = self._list('ports')
         self.assertEqual(len(ports['ports']), 5)
         # avoid passing the mgmt port twice in argument list
@@ -291,8 +280,12 @@ class TestN1kvTrunkingPluggingDriver(
 
         def _fake_delete_resources(context, name, deleter,
                                    exception_type, resource_ids):
+            if self.test_driver == N1kvTrunkingPlugDriver:
+                r_type = 'trunk network'
+            else:
+                r_type = 'trunk port'
             if counters['attempts'] < counters['max_attempts']:
-                if name == "trunk network":
+                if name == r_type:
                     counters['attempts'] += 1
                 return
             real_delete_resources(context, name, deleter,
@@ -312,9 +305,13 @@ class TestN1kvTrunkingPluggingDriver(
         res = plugging_driver.create_hosting_device_resources(
             ctx, "some_id", tenant_id, mgmt_context, 2)
         nets = self._list('networks')
-        self.assertEqual(len(nets['networks']), 5)
         subnets = self._list('subnets')
-        self.assertEqual(len(subnets['subnets']), 5)
+        if self.test_driver == N1kvTrunkingPlugDriver:
+            self.assertEqual(len(nets['networks']), 5)
+            self.assertEqual(len(subnets['subnets']), 5)
+        else:
+            self.assertEqual(len(nets['networks']), 3)
+            self.assertEqual(len(subnets['subnets']), 3)
         ports = self._list('ports')
         self.assertEqual(len(ports['ports']), 5)
         # avoid passing the mgmt port twice in argument list
@@ -329,8 +326,12 @@ class TestN1kvTrunkingPluggingDriver(
                 counters = {'attempts': 0, 'max_attempts': 2}
                 plugging_driver.delete_hosting_device_resources(
                     ctx, tenant_id, mgmt_port, **res)
-                # three retry iterations with four calls per iteration
-                self.assertEqual(delete_mock.call_count, 12)
+                if self.test_driver == N1kvTrunkingPlugDriver:
+                    # three retry iterations with four calls per iteration
+                    self.assertEqual(delete_mock.call_count, 12)
+                else:
+                    # three retry iterations with 2 calls per iteration
+                    self.assertEqual(delete_mock.call_count, 6)
                 nets = self._list('networks')['networks']
                 self.assertEqual(len(nets), 1)
                 subnets = self._list('subnets')['subnets']
@@ -352,9 +353,13 @@ class TestN1kvTrunkingPluggingDriver(
         res = plugging_driver.create_hosting_device_resources(
             ctx, "some_id", tenant_id, mgmt_context, 2)
         nets = self._list('networks')
-        self.assertEqual(len(nets['networks']), 5)
         subnets = self._list('subnets')
-        self.assertEqual(len(subnets['subnets']), 5)
+        if self.test_driver == N1kvTrunkingPlugDriver:
+            self.assertEqual(len(nets['networks']), 5)
+            self.assertEqual(len(subnets['subnets']), 5)
+        else:
+            self.assertEqual(len(nets['networks']), 3)
+            self.assertEqual(len(subnets['subnets']), 3)
         ports = self._list('ports')
         self.assertEqual(len(ports['ports']), 5)
         # avoid passing the mgmt port twice in argument list
@@ -368,12 +373,18 @@ class TestN1kvTrunkingPluggingDriver(
                     '.sleep'):
                 plugging_driver.delete_hosting_device_resources(
                     ctx, tenant_id, mgmt_port, **res)
-                # four retry iterations with four calls per iteration
-                self.assertEqual(delete_mock.call_count, 16)
                 nets = self._list('networks')['networks']
-                self.assertEqual(len(nets), 5)
                 subnets = self._list('subnets')['subnets']
-                self.assertEqual(len(subnets), 5)
+                if self.test_driver == N1kvTrunkingPlugDriver:
+                    # four retry iterations with four calls per iteration
+                    self.assertEqual(delete_mock.call_count, 16)
+                    self.assertEqual(len(nets), 5)
+                    self.assertEqual(len(subnets), 5)
+                else:
+                    # four retry iterations with 2 calls per iteration
+                    self.assertEqual(delete_mock.call_count, 8)
+                    self.assertEqual(len(nets), 3)
+                    self.assertEqual(len(subnets), 3)
                 ports = self._list('ports')
                 self.assertEqual(len(ports['ports']), 5)
 
@@ -616,27 +627,49 @@ class TestMonolithicN1kvTrunkingPluggingDriver(TestN1kvTrunkingPluggingDriver):
 
     test_driver = N1kvTrunkingPlugDriver
 
-    def test__get_network_profile_id(self):
-        m1 = mock.MagicMock(return_value=[{'id': 'profile_uuid1'}])
-        self.core_plugin.get_network_profiles = m1
+    def test__create_resources(self):
         plugging_driver = self.test_driver()
-        p_id = plugging_driver._get_profile_id('net_profile', 'net profile',
-                                               'the_profile')
-        self.assertEqual(p_id, 'profile_uuid1')
-
-    def test__get_network_profile_id_multiple_match(self):
-        m1 = mock.MagicMock(return_value=[{'id': 'profile_uuid1'},
-                                          {'id': 'profile_uuid2'}])
-        self.core_plugin.get_network_profiles = m1
-        plugging_driver = self.test_driver()
-        p_id = plugging_driver._get_profile_id('net_profile', 'net profile',
-                                               'the_profile')
-        self.assertEqual(p_id, None)
-
-    def test__get_network_profile_id_no_match(self):
-        m1 = mock.MagicMock(return_value=[])
-        self.core_plugin.get_network_profiles = m1
-        plugging_driver = self.test_driver()
-        p_id = plugging_driver._get_profile_id('net_profile', 'net profile',
-                                               'the_profile')
-        self.assertEqual(p_id, None)
+        tenant_id = 'tenant_uuid1'
+        ctx = context.Context('', tenant_id, is_admin=True)
+        n_spec = {'network': {
+            'tenant_id': tenant_id,
+            'admin_state_up': True,
+            'name': n1kv_const.T1_NETWORK_NAME,
+            'shared': False}}
+        s_spec = {'subnet': {
+            'tenant_id': tenant_id,
+            'admin_state_up': True,
+            'cidr': n1kv_const.SUBNET_PREFIX,
+            'enable_dhcp': False,
+            'gateway_ip': attributes.ATTR_NOT_SPECIFIED,
+            'allocation_pools': attributes.ATTR_NOT_SPECIFIED,
+            'ip_version': 4,
+            'dns_nameservers': attributes.ATTR_NOT_SPECIFIED,
+            'host_routes': attributes.ATTR_NOT_SPECIFIED}}
+        p_spec = {'port': {
+            'tenant_id': tenant_id,
+            'admin_state_up': True,
+            'name': 'mgmt',
+            'mac_address': attributes.ATTR_NOT_SPECIFIED,
+            'fixed_ips': attributes.ATTR_NOT_SPECIFIED,
+            'n1kv:profile_id': 'profile_uuid',
+            'device_id': "",
+            # Use device_owner attribute to ensure we can query for these
+            # ports even before Nova has set device_id attribute.
+            'device_owner': "some_id"}}
+        t1_n, t1_sn, t1_p = [], [], []
+        if self.test_driver == N1kvTrunkingPlugDriver:
+            plugging_driver._create_resources(
+                ctx, 'T1', 0, n_spec, 't1_n:', 'net_profile_id', t1_n,
+                s_spec, 't1_sn:', t1_sn, p_spec, 't1_p:', 'profile_id', t1_p)
+        else:
+            plugging_driver._create_resources(
+                ctx, 'T1', 0, n_spec, 't1_n:', t1_n, s_spec, 't1_sn:', t1_sn,
+                p_spec, 't1_p:', 'profile_id', t1_p)
+        self.assertEqual(len(t1_n), 1)
+        self.assertEqual(t1_n[0]['name'], 't1_n:1')
+        self.assertEqual(len(t1_sn), 1)
+        self.assertEqual(t1_sn[0]['name'], 't1_sn:1')
+        self.assertEqual(len(t1_p), 1)
+        self.assertEqual(t1_p[0]['name'], 't1_p:1')
+        self.assertEqual(t1_p[0]['device_owner'], 'some_id')

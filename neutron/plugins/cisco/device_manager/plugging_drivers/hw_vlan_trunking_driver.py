@@ -18,20 +18,30 @@ from oslo_utils import excutils
 from neutron.common import constants as l3_constants
 from neutron.extensions import providernet as pr_net
 from neutron.i18n import _LE
+from neutron import manager
 from neutron.plugins.cisco.device_manager import config
-from neutron.plugins.cisco.device_manager.plugging_drivers import (
-    n1kv_trunking_driver)
+import neutron.plugins.cisco.device_manager.plugging_drivers as plug
 
 LOG = logging.getLogger(__name__)
 
+DEVICE_OWNER_ROUTER_GW = l3_constants.DEVICE_OWNER_ROUTER_GW
 
-class HwVLANTrunkingPlugDriver(n1kv_trunking_driver.N1kvTrunkingPlugDriver):
+
+class HwVLANTrunkingPlugDriver(plug.PluginSidePluggingDriver):
     """Driver class for Cisco hardware-based devices.
 
     The driver works with VLAN segmented Neutron networks.
     """
     # once initialized _device_network_interface_map is dictionary
     _device_network_interface_map = None
+
+    @property
+    def _core_plugin(self):
+        try:
+            return self._plugin
+        except AttributeError:
+            self._plugin = manager.NeutronManager.get_plugin()
+            return self._plugin
 
     def create_hosting_device_resources(self, context, complementary_id,
                                         tenant_id, mgmt_context, max_hosted):
@@ -57,10 +67,13 @@ class HwVLANTrunkingPlugDriver(n1kv_trunking_driver.N1kvTrunkingPlugDriver):
     def extend_hosting_port_info(self, context, port_db, hosting_device,
                                  hosting_info):
         hosting_info['segmentation_id'] = port_db.hosting_info.segmentation_id
-        is_external = port_db.get('router_port', {}).get(
-            'port_type') == l3_constants.DEVICE_OWNER_ROUTER_GW
-        hosting_info['physical_interface'] = self._get_interface_info(
-            hosting_device['id'], port_db.network_id, is_external)
+        if port_db.routerport is not None:
+            is_external = (
+                port_db.routerport.port_type == DEVICE_OWNER_ROUTER_GW)
+            hosting_info['physical_interface'] = self._get_interface_info(
+                hosting_device['id'], port_db.network_id, is_external)
+        else:
+            hosting_info['physical_interface'] = None
 
     def allocate_hosting_port(self, context, router_id, port_db, network_type,
                               hosting_device_id):
