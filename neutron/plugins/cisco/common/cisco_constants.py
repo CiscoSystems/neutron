@@ -176,3 +176,6 @@ ROUTER_PENDING_DELETE = "PENDING_DELETE"
 # Values for network profile fields
 ADD_TENANTS = 'add_tenants'
 REMOVE_TENANTS = 'remove_tenants'
+
+# Time format
+ISO8601_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'

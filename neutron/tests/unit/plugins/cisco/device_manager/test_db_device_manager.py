@@ -12,6 +12,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import os
+
 import contextlib
 import mock
 
@@ -19,6 +21,7 @@ from oslo_config import cfg
 from oslo_utils import importutils
 import webob.exc
 
+import neutron
 from neutron.api import extensions as api_ext
 from neutron.common import config
 from neutron import context as n_context
@@ -34,6 +37,9 @@ from neutron.tests.unit.db import test_db_base_plugin_v2
 from neutron.tests.unit.plugins.cisco.device_manager import (
     device_manager_test_support)
 
+
+policy_path = (os.path.abspath(neutron.__path__[0]) +
+               '/../etc/policy.json')
 
 DB_DM_PLUGIN_KLASS = (
     'neutron.plugins.cisco.db.device_manager.hosting_device_manager_db.'
@@ -90,6 +96,10 @@ class DeviceManagerTestCaseMixin(object):
             template_id=template_id, management_port_id=management_port_id,
             admin_state_up=admin_state_up, **kwargs)}
         hd_req = self.new_create_request('hosting_devices', data, fmt)
+        if kwargs.get('set_context') and 'tenant_id' in kwargs:
+            # create a specific auth context for this request
+            hd_req.environ['neutron.context'] = n_context.Context(
+                '', kwargs['tenant_id'])
         hd_res = hd_req.get_response(self.ext_api)
         if expected_res_status:
             self.assertEqual(hd_res.status_int, expected_res_status)
@@ -126,7 +136,10 @@ class DeviceManagerTestCaseMixin(object):
                     **kwargs)}
         hdt_req = self.new_create_request('hosting_device_templates', data,
                                           fmt)
-
+        if kwargs.get('set_context') and 'tenant_id' in kwargs:
+            # create a specific auth context for this request
+            hdt_req.environ['neutron.context'] = n_context.Context(
+                '', kwargs['tenant_id'])
         hdt_res = hdt_req.get_response(self.ext_api)
         if expected_res_status:
             self.assertEqual(hdt_res.status_int, expected_res_status)
@@ -263,7 +276,8 @@ class TestDeviceManagerDBPlugin(
         super(TestDeviceManagerDBPlugin, self).setUp(
             plugin=core_plugin, service_plugins=service_plugins,
             ext_mgr=ext_mgr)
-
+        # Ensure we use policy definitions from our repo
+        cfg.CONF.set_override('policy_file', policy_path)
         if not ext_mgr:
             self.plugin = importutils.import_object(dm_plugin)
             ext_mgr = api_ext.PluginAwareExtensionManager(
@@ -508,6 +522,46 @@ class TestDeviceManagerDBPlugin(
                         self.assertEqual(mock_prepare.call_count, 0)
                         self.assertEqual(mock_call.call_count, 0)
 
+    def test_hosting_device_policy(self):
+        device_id = "device_XYZ"
+        with self.hosting_device_template() as hdt:
+            hdt_id = hdt['hosting_device_template']['id']
+            tenant_id = hdt['hosting_device_template']['tenant_id']
+            with self.port(subnet=self._mgmt_subnet) as mgmt_port:
+                mgmt_port_id = mgmt_port['port']['id']
+                creds = device_manager_test_support._uuid()
+                with self.hosting_device(
+                        device_id=device_id,
+                        template_id=hdt_id,
+                        management_port_id=mgmt_port_id,
+                        credentials_id=creds) as hd:
+                    hd_id = hd['hosting_device']['id']
+                    # create fails
+                    self._create_hosting_device(
+                        self.fmt, hdt_id, mgmt_port_id, True,
+                        webob.exc.HTTPForbidden.code,
+                        tenant_id=tenant_id, set_context=True)
+                    non_admin_ctx = n_context.Context('', tenant_id)
+                    # show fails
+                    self._show('hosting_devices', hd_id,
+                               webob.exc.HTTPNotFound.code, non_admin_ctx)
+                    # update fails
+                    self._update('hosting_devices', hd_id,
+                                 {'hosting_device': {'name': 'new_name'}},
+                                 webob.exc.HTTPForbidden.code, non_admin_ctx)
+                    # delete fails
+                    self._delete('hosting_devices', hd_id,
+                                 webob.exc.HTTPNotFound.code, non_admin_ctx)
+                    # get config fails
+                    req = self.new_show_request(
+                        'hosting_devices', hd_id, self.fmt,
+                        'get_hosting_device_config')
+                    req.environ['neutron.context'] = non_admin_ctx
+                    res = req.get_response(self._api_for_resource(
+                        'hosting_devices'))
+                    self.assertEqual(webob.exc.HTTPNotFound.code,
+                                     res.status_int)
+
     def test_create_vm_hosting_device_template(self):
         attrs = self._get_test_hosting_device_template_attr()
 
@@ -596,6 +650,27 @@ class TestDeviceManagerDBPlugin(
                                                 hdt_id, fmt=self.fmt)
                     res = req.get_response(self.ext_api)
                     self.assertEqual(res.status_int, 200)
+
+    def test_hosting_device_template_policy(self):
+        with self.hosting_device_template() as hdt:
+            hdt_id = hdt['hosting_device_template']['id']
+            tenant_id = hdt['hosting_device_template']['tenant_id']
+            # create fails
+            self._create_hosting_device_template(
+                self.fmt, 'my_template', True, 'Hardware',
+                webob.exc.HTTPForbidden.code,
+                tenant_id=tenant_id, set_context=True)
+            non_admin_ctx = n_context.Context('', tenant_id)
+            # show fail
+            self._show('hosting_device_templates', hdt_id,
+                       webob.exc.HTTPNotFound.code, non_admin_ctx)
+            # update fail
+            self._update('hosting_device_templates', hdt_id,
+                         {'hosting_device_template': {'enabled': False}},
+                         webob.exc.HTTPForbidden.code, non_admin_ctx)
+            # delete fail
+            self._delete('hosting_device_templates', hdt_id,
+                         webob.exc.HTTPNotFound.code, non_admin_ctx)
 
     # driver request test helper
     def _test_get_driver(self, get_method, id=None, test_for_none=False,

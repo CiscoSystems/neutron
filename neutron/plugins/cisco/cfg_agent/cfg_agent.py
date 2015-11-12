@@ -48,8 +48,7 @@ LOG = logging.getLogger(__name__)
 REGISTRATION_RETRY_DELAY = 2
 MAX_REGISTRATION_ATTEMPTS = 30
 
-# Time format
-ISO8601_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
+ISO8601_TIME_FORMAT = c_constants.ISO8601_TIME_FORMAT
 
 
 class CiscoDeviceManagementApi(object):

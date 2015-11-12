@@ -13,6 +13,7 @@
 #    under the License.
 
 import copy
+from datetime import datetime
 
 import mock
 from novaclient import exceptions as nova_exc
@@ -48,6 +49,7 @@ LOG = logging.getLogger(__name__)
 
 
 _uuid = uuidutils.generate_uuid
+ISO8601_TIME_FORMAT = cisco_constants.ISO8601_TIME_FORMAT
 
 CORE_PLUGIN_KLASS = (
     'neutron.tests.unit.plugins.cisco.device_manager'
@@ -251,7 +253,7 @@ class DeviceManagerTestSupportMixin(object):
             agent_callback.report_state(
                 self.adminContext,
                 agent_state={'agent_state': l3_cfg_host_a},
-                time=timeutils.strtime())
+                time=datetime.utcnow().strftime(ISO8601_TIME_FORMAT))
             dev_mgr_callback.register_for_duty(self.adminContext,
                                                L3_CFG_HOST_A)
         if host_b_active is True:
@@ -260,7 +262,7 @@ class DeviceManagerTestSupportMixin(object):
             l3_cfg_host_b['local_time'] = str(timeutils.utcnow()),
             agent_callback.report_state(
                 self.adminContext, agent_state={'agent_state': l3_cfg_host_b},
-                time=timeutils.strtime())
+                time=datetime.utcnow().strftime(ISO8601_TIME_FORMAT))
             dev_mgr_callback.register_for_duty(self.adminContext,
                                                L3_CFG_HOST_B)
         if host_c_active is True:
@@ -269,7 +271,7 @@ class DeviceManagerTestSupportMixin(object):
             l3_cfg_host_c['local_time'] = str(timeutils.utcnow()),
             agent_callback.report_state(
                 self.adminContext, agent_state={'agent_state': l3_cfg_host_c},
-                time=timeutils.strtime())
+                time=datetime.utcnow().strftime(ISO8601_TIME_FORMAT))
             dev_mgr_callback.register_for_duty(self.adminContext,
                                                L3_CFG_HOST_B)
 
