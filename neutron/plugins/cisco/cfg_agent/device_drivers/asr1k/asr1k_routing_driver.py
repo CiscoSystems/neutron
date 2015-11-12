@@ -114,7 +114,7 @@ class ASR1kRoutingDriver(iosxe_driver.IosXeRoutingDriver):
         cfg_syncer.delete_invalid_cfg()
 
     def get_configuration(self):
-        return self._get_running_config()
+        return self._get_running_config(split=False)
 
     # ============== Internal "preparation" functions  ==============
 

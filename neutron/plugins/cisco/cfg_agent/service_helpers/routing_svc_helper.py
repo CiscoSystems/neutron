@@ -136,13 +136,14 @@ class CiscoRoutingPluginApi(object):
 
     def send_update_port_statuses(self, context, port_ids, status):
         """Call the pluging to update the port status which updates the DB.
+
         :param context: contains user information
         :param port_ids: list of ids of the ports associated with the status
         :param status: value of the status for the given port list (port_ids)
         """
-        cctx = self.client.prepare(version='1.1')
-        return cctx.call(context, 'update_port_statuses_cfg',
-                         port_ids=port_ids, status=status)
+        cctxt = self.client.prepare(version='1.1')
+        return cctxt.call(context, 'update_port_statuses_cfg',
+                          port_ids=port_ids, status=status)
 
 
 class RoutingServiceHelper(object):
@@ -223,7 +224,8 @@ class RoutingServiceHelper(object):
                 self.sync_devices.clear()
                 routers = self._fetch_router_info(all_routers=True)
                 LOG.debug("All routers: %s" % (pp.pformat(routers)))
-                self._cleanup_invalid_cfg(routers)
+                if routers:
+                    self._cleanup_invalid_cfg(routers)
             else:
                 if self.updated_routers:
                     router_ids = list(self.updated_routers)
@@ -755,6 +757,9 @@ class RoutingServiceHelper(object):
     def _external_gateway_added(self, ri, ex_gw_port):
         driver = self.driver_manager.get_driver(ri.id)
         driver.external_gateway_added(ri, ex_gw_port)
+        if ri.snat_enabled and ri.internal_ports:
+            for port in ri.internal_ports:
+                driver.enable_internal_network_NAT(ri, port, ex_gw_port)
 
     def _external_gateway_removed(self, ri, ex_gw_port):
         driver = self.driver_manager.get_driver(ri.id)

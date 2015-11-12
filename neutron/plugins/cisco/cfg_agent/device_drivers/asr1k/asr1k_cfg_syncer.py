@@ -124,7 +124,7 @@ class ConfigSyncer(object):
             router_id_dict[short_router_id] = router
 
             interfaces = []
-            if '_interfaces' in router.keys():
+            if '_interfaces' in router:
                 interfaces += router['_interfaces']
 
             # Orgnize interfaces, indexed by segment_id
@@ -143,10 +143,10 @@ class ConfigSyncer(object):
             # Mark which segments have NAT enabled
             # i.e., the segment is present on at least 1 router with
             # both external and internal networks present
-            if 'gw_port' in router.keys():
+            if 'gw_port' in router:
                 gw_port = router['gw_port']
                 gw_segment_id = gw_port['hosting_info']['segmentation_id']
-                if '_interfaces' in router.keys():
+                if '_interfaces' in router:
                     interfaces = router['_interfaces']
                     for intf in interfaces:
                         if intf['device_owner'] == \
@@ -259,7 +259,7 @@ class ConfigSyncer(object):
         rconf_ids = []
 
         for parsed_obj in parsed_cfg.find_objects(VRF_REGEX_NEW):
-            LOG.info(_LI("VRF object: %s"), (parsed_obj))
+            LOG.info(_LI("VRF object: %s"), parsed_obj)
             match_obj = re.match(VRF_REGEX_NEW, parsed_obj.text)
             router_id = match_obj.group(1)
             LOG.info(_LI("    First 6 digits of router ID: %s\n"),
@@ -275,7 +275,7 @@ class ConfigSyncer(object):
         source_set = set(ostk_router_ids)
         dest_set = set(rconf_ids)
 
-        # add_set = source_set.difference(dest_set)
+        #add_set = source_set.difference(dest_set)
         del_set = dest_set.difference(source_set)
 
         LOG.info(_LI("VRF DB set: %s"), (source_set))
@@ -381,7 +381,6 @@ class ConfigSyncer(object):
             match_obj = re.match(route_regex, route.text)
             router_id, segment_id, next_hop = \
                 match_obj.group(1, 2, 3)
-            segment_id = int(segment_id)
 
             LOG.info(_LI("    router_id: %(router_id)s, segment_id:"
                          " %(segment_id)s, next_hop: %(next_hop)s") %
