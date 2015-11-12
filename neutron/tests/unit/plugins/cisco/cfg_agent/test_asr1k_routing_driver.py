@@ -17,6 +17,7 @@ import sys
 
 import mock
 import netaddr
+from oslo_config import cfg
 from oslo_utils import uuidutils
 
 from neutron.common import constants as l3_constants
@@ -359,6 +360,8 @@ class ASR1kRoutingDriver(base.BaseTestCase):
         self.assert_edit_run_cfg(csr_snippets.REMOVE_ACL, acl_name)
 
     def test_get_configuration(self):
+        import pdb
+        pdb.set_trace()
         self.driver._get_running_config = mock.MagicMock()
         self.driver.get_configuration()
-        self.driver._get_running_config.assert_called_once_with()
+        self.driver._get_running_config.assert_called_once_with(split=False)
