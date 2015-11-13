@@ -14,18 +14,20 @@
 
 # Constants for the N1kv plugging drivers.
 
-# These prefix defines will go away when Nova allows spinning up
+# These cidr and prefix defines will go away when Nova allows spinning up
 # VMs with vifs on networks without subnet(s).
 SUBNET_PREFIX = '172.16.1.0/24'
+T1_SUBNET_CIDR = '172.16.0.0/13'
+T2_SUBNET_CIDR = '172.24.0.0/13'
 
 # T1 port/network is for VXLAN
 T1_PORT_NAME = 't1_p:'
 # T2 port/network is for VLAN
 T2_PORT_NAME = 't2_p:'
-T1_NETWORK_NAME = 't1_n:'
-T2_NETWORK_NAME = 't2_n:'
-T1_SUBNET_NAME = 't1_sn:'
-T2_SUBNET_NAME = 't2_sn:'
+T1_NETWORK_NAME = 't1_net'
+T2_NETWORK_NAME = 't2_net'
+T1_SUBNET_NAME = 't1_subnet'
+T2_SUBNET_NAME = 't2_subnet'
 
 T1_SUBNET_START_PREFIX = '172.16.'
 T2_SUBNET_START_PREFIX = '172.32.'

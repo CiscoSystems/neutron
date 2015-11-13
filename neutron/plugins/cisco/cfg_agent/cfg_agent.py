@@ -12,6 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from datetime import datetime
 import eventlet
 eventlet.monkey_patch()
 import pprint
@@ -23,8 +24,6 @@ from oslo_config import cfg
 from oslo_log import log as logging
 import oslo_messaging
 from oslo_utils import importutils
-from oslo_utils import timeutils
-
 
 from neutron.agent.common import config
 from neutron.agent.linux import external_process
@@ -48,6 +47,8 @@ LOG = logging.getLogger(__name__)
 # Constants for agent registration.
 REGISTRATION_RETRY_DELAY = 2
 MAX_REGISTRATION_ATTEMPTS = 30
+
+ISO8601_TIME_FORMAT = c_constants.ISO8601_TIME_FORMAT
 
 
 class CiscoDeviceManagementApi(object):
@@ -262,7 +263,7 @@ class CiscoCfgAgent(manager.Manager):
                 pass
         except KeyError as e:
             LOG.error(_LE("Invalid payload format for received RPC message "
-                          "agent_updated. Error is %(error)s. Payload is "
+                          "`agent_updated`. Error is %(error)s. Payload is "
                           "%(payload)s"), {'error': e, 'payload': payload})
 
     def hosting_devices_assigned_to_cfg_agent(self, context, payload):
@@ -274,7 +275,7 @@ class CiscoCfgAgent(manager.Manager):
                 self.routing_service_helper.fullsync = True
         except KeyError as e:
             LOG.error(_LE("Invalid payload format for received RPC message "
-                          "hosting_devices_assigned_to_cfg_agent. Error is "
+                          "`hosting_devices_assigned_to_cfg_agent`. Error is "
                           "%(error)s. Payload is %(payload)s"),
                       {'error': e, 'payload': payload})
 
@@ -286,7 +287,7 @@ class CiscoCfgAgent(manager.Manager):
                 pass
         except KeyError as e:
             LOG.error(_LE("Invalid payload format for received RPC message "
-                          "hosting_devices_unassigned_from_cfg_agent. Error "
+                          "`hosting_devices_unassigned_from_cfg_agent`. Error "
                           "is %(error)s. Payload is %(payload)s"),
                       {'error': e, 'payload': payload})
 
@@ -298,7 +299,7 @@ class CiscoCfgAgent(manager.Manager):
                     self.process_services(removed_devices_info=payload)
         except KeyError as e:
             LOG.error(_LE("Invalid payload format for received RPC message "
-                          "hosting_devices_removed. Error is %(error)s. "
+                          "`hosting_devices_removed`. Error is %(error)s. "
                           "Payload is %(payload)s"), {'error': e,
                                                       'payload': payload})
 
@@ -402,7 +403,8 @@ class CiscoCfgAgentWithStateReport(CiscoCfgAgent):
         configurations['monitored_hosting_devices'] = monitored_hosting_devices
         configurations['service_agents'] = service_agents
         self.agent_state['configurations'] = configurations
-        self.agent_state['local_time'] = str(timeutils.utcnow())
+        self.agent_state['local_time'] = datetime.utcnow().strftime(
+            ISO8601_TIME_FORMAT)
         LOG.debug("State report data: %s", pprint.pformat(self.agent_state))
         self.send_agent_report(self.agent_state, self.context)
 

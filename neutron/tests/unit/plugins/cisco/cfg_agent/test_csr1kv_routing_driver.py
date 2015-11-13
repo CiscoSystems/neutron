@@ -286,4 +286,4 @@ class TestCSR1kvRouting(base.BaseTestCase):
     def test_get_configuration(self):
         self.driver._get_running_config = mock.MagicMock()
         self.driver.get_configuration()
-        self.driver._get_running_config.assert_called_once_with()
+        self.driver._get_running_config.assert_called_once_with(split=False)

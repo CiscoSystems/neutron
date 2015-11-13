@@ -201,7 +201,7 @@ class ConfigSyncer(object):
             router_id_dict[short_router_id] = router
 
             interfaces = []
-            if '_interfaces' in router.keys():
+            if '_interfaces' in router:
                 interfaces += router['_interfaces']
 
             # Orgnize interfaces, indexed by segment_id
@@ -220,10 +220,10 @@ class ConfigSyncer(object):
             # Mark which segments have NAT enabled
             # i.e., the segment is present on at least 1 router with
             # both external and internal networks present
-            if 'gw_port' in router.keys():
+            if 'gw_port' in router:
                 gw_port = router['gw_port']
                 gw_segment_id = gw_port['hosting_info']['segmentation_id']
-                if '_interfaces' in router.keys():
+                if '_interfaces' in router:
                     interfaces = router['_interfaces']
                     for intf in interfaces:
                         if intf['device_owner'] == \
@@ -362,7 +362,7 @@ class ConfigSyncer(object):
         source_set = set(ostk_router_ids)
         dest_set = set(rconf_ids)
 
-        # add_set = source_set.difference(dest_set)
+        #add_set = source_set.difference(dest_set)
         del_set = dest_set.difference(source_set)
 
         LOG.info(_LI("VRF DB set: %s"), (source_set))

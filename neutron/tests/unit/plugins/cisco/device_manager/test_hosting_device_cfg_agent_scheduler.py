@@ -12,12 +12,14 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import os
 import contextlib
 
 import mock
 from oslo_config import cfg
 from webob import exc
 
+import neutron
 from neutron.api.v2 import attributes
 from neutron import context as n_context
 from neutron import manager
@@ -34,6 +36,9 @@ from neutron.tests.unit.plugins.cisco.device_manager import (
     test_db_device_manager)
 from neutron.tests.unit.plugins.openvswitch import test_agent_scheduler
 
+
+policy_path = (os.path.abspath(neutron.__path__[0]) +
+               '/../etc/policy.json')
 
 CORE_PLUGIN_KLASS = dev_mgr_test_support.CORE_PLUGIN_KLASS
 HW_CATEGORY = ciscohostingdevicemanager.HARDWARE_CATEGORY
@@ -120,6 +125,8 @@ class HostingDeviceConfigAgentSchedulerTestCaseBase(
             plugin=core_plugin, service_plugins=service_plugins,
             ext_mgr=ext_mgr)
 
+        # Ensure we use policy definitions from our repo
+        cfg.CONF.set_override('policy_file', policy_path)
         self.core_plugin = manager.NeutronManager.get_plugin()
         self.plugin = self.core_plugin
         self.setup_notification_driver()

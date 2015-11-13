@@ -12,6 +12,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import os
+
 import contextlib
 
 import mock
@@ -49,6 +51,7 @@ L3_PLUGIN_KLASS = (
     'neutron.tests.unit.plugins.cisco.l3.test_l3_router_appliance_plugin.'
     'TestApplianceL3RouterServicePlugin')
 extensions_path = neutron.plugins.__path__[0] + '/cisco/extensions'
+policy_path = os.path.abspath(neutron.__path__[0]) + '/../etc/policy.json'
 
 
 class TestL3RouterApplianceExtensionManager(
@@ -150,6 +153,9 @@ class L3RouterApplianceTestCaseBase(
             plugin=core_plugin, service_plugins=service_plugins,
             ext_mgr=ext_mgr)
 
+        # Ensure we use policy definitions from our repo
+        cfg.CONF.set_override('policy_file', policy_path)
+
         self.core_plugin = manager.NeutronManager.get_plugin()
         self.plugin = manager.NeutronManager.get_service_plugins().get(
             service_constants.L3_ROUTER_NAT)
@@ -211,10 +217,6 @@ class L3RouterApplianceTestCaseBase(
         device_manager_test_support.TestCorePlugin._svc_vm_mgr_obj = None
         device_manager_test_support.TestCorePlugin._nova_running = False
 
-        #TODO(bobmel): Investigate why the following lines need to be disabled
-#        plugin = manager.NeutronManager.get_service_plugins()[
-#            service_constants.L3_ROUTER_NAT]
-#        plugin._heartbeat.stop()
         self.restore_attribute_map()
         super(L3RouterApplianceTestCaseBase, self).tearDown()
 
