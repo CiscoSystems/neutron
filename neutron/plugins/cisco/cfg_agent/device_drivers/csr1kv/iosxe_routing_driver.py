@@ -21,6 +21,7 @@ import xml.etree.ElementTree as ET
 
 import ciscoconfparse
 from ncclient import manager
+from ncclient.operations.rpc import RPCError
 
 from oslo_config import cfg
 
@@ -656,7 +657,7 @@ class IosXeRoutingDriver(devicedriver_api.RoutingDriverBase):
         try:
             rpc_obj = conn.edit_config(target='running', config=conf_str)
             self._check_response(rpc_obj, snippet, conf_str=conf_str)
-        except Exception:
+        except Exception as e:
             # Here we catch all exceptions caused by REMOVE_/DELETE_ configs
             # to avoid config agent to get stuck once it hits this condition.
             # This is needed since the current ncclient version (0.4.2)
@@ -668,11 +669,15 @@ class IosXeRoutingDriver(devicedriver_api.RoutingDriverBase):
             # ncclient version is increased.
             if re.search(r"REMOVE_|DELETE_", snippet):
                 LOG.error(_LE("Pass exception for %s"), snippet)
-            else:
-                raise
+            elif isinstance(e, RPCError):
+                e_tag = e.tag
+                e_type = e.type
+                params = {'snippet': snippet, 'type': e_type, 'tag': e_tag,
+                          'dev_id': self.hosting_device['id'],
+                          'ip': self._host_ip, 'confstr': conf_str}
+                raise cfg_exc.CSR1kvConfigException(**params)
 
-    @staticmethod
-    def _check_response(rpc_obj, snippet_name, conf_str=None):
+    def _check_response(self, rpc_obj, snippet_name, conf_str=None):
         """This function checks the rpc response object for status.
 
         This function takes as input the response rpc_obj and the snippet name
@@ -709,5 +714,6 @@ class IosXeRoutingDriver(devicedriver_api.RoutingDriverBase):
         e_type = rpc_obj._root[0][0].text
         e_tag = rpc_obj._root[0][1].text
         params = {'snippet': snippet_name, 'type': e_type, 'tag': e_tag,
-                  'conf_str': conf_str}
+                  'dev_id': self.hosting_device['id'],
+                  'ip': self._host_ip, 'confstr': conf_str}
         raise cfg_exc.CSR1kvConfigException(**params)
