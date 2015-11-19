@@ -67,13 +67,9 @@ class HwVLANTrunkingPlugDriver(plug.PluginSidePluggingDriver):
     def extend_hosting_port_info(self, context, port_db, hosting_device,
                                  hosting_info):
         hosting_info['segmentation_id'] = port_db.hosting_info.segmentation_id
-        if port_db.routerport is not None:
-            is_external = (
-                port_db.routerport.port_type == DEVICE_OWNER_ROUTER_GW)
-            hosting_info['physical_interface'] = self._get_interface_info(
-                hosting_device['id'], port_db.network_id, is_external)
-        else:
-            hosting_info['physical_interface'] = None
+        is_external = (port_db.device_owner == DEVICE_OWNER_ROUTER_GW)
+        hosting_info['physical_interface'] = self._get_interface_info(
+            hosting_device['id'], port_db.network_id, is_external)
 
     def allocate_hosting_port(self, context, router_id, port_db, network_type,
                               hosting_device_id):

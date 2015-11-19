@@ -403,7 +403,7 @@ class CiscoCfgAgentWithStateReport(CiscoCfgAgent):
         configurations['monitored_hosting_devices'] = monitored_hosting_devices
         configurations['service_agents'] = service_agents
         self.agent_state['configurations'] = configurations
-        self.agent_state['local_time'] = datetime.utcnow().strftime(
+        self.agent_state['local_time'] = datetime.now().strftime(
             ISO8601_TIME_FORMAT)
         LOG.debug("State report data: %s", pprint.pformat(self.agent_state))
         self.send_agent_report(self.agent_state, self.context)
