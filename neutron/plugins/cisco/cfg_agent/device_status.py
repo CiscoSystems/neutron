@@ -161,9 +161,10 @@ class DeviceStatus(object):
                       {'hd_id': hd_id, 'ip': hd_mgmt_ip})
             return False
 
-        # Modifying the 'created_at' to a date time object
-        hosting_device['created_at'] = datetime.datetime.strptime(
-            hosting_device['created_at'], '%Y-%m-%d %H:%M:%S')
+        # Modifying the 'created_at' to a date time object if it is not
+        if not isinstance(hd['created_at'], datetime.datetime):
+            hd['created_at'] = datetime.datetime.strptime(hd['created_at'],
+                                                          '%Y-%m-%d %H:%M:%S')
 
         if _is_pingable(hd_mgmt_ip):
             LOG.debug("Hosting device: %(hd_id)s@%(ip)s is reachable.",
