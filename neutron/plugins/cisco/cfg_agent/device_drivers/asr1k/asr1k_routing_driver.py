@@ -37,6 +37,7 @@ DEVICE_OWNER_ROUTER_GW = constants.DEVICE_OWNER_ROUTER_GW
 HA_INFO = 'ha_info'
 ROUTER_ROLE_ATTR = routerrole.ROUTER_ROLE_ATTR
 ROUTER_ROLE_HA_REDUNDANCY = cisco_constants.ROUTER_ROLE_HA_REDUNDANCY
+ROUTER_ROLE_GLOBAL = cisco_constants.ROUTER_ROLE_GLOBAL
 
 
 class ASR1kRoutingDriver(iosxe_driver.IosXeRoutingDriver):
@@ -257,8 +258,8 @@ class ASR1kRoutingDriver(iosxe_driver.IosXeRoutingDriver):
                           "%s"), cse)
 
     def _add_default_route(self, ri, ext_gw_port):
-        if self._fullsync and (
-                    ri.router_id in self._existing_cfg_dict['routes']):
+        if self._fullsync and (ri.router_id in
+                               self._existing_cfg_dict['routes']):
             LOG.debug("Default route already exists, skipping")
             return
         ext_gw_ip = ext_gw_port['subnets'][0]['gateway_ip']
@@ -280,7 +281,9 @@ class ASR1kRoutingDriver(iosxe_driver.IosXeRoutingDriver):
                                       'REMOVE_DEFAULT_ROUTE_WITH_INTF')
 
     def _add_ha_hsrp(self, ri, port):
-        if ri.router.get(ROUTER_ROLE_ATTR) == ROUTER_ROLE_HA_REDUNDANCY:
+        priority = None
+        if ri.router.get(ROUTER_ROLE_ATTR) in (ROUTER_ROLE_HA_REDUNDANCY,
+                                               ROUTER_ROLE_GLOBAL):
             for router in ri.router[ha.DETAILS][ha.REDUNDANCY_ROUTERS]:
                 if ri.router['id'] == router['id']:
                     priority = router[ha.PRIORITY]
@@ -299,7 +302,11 @@ class ASR1kRoutingDriver(iosxe_driver.IosXeRoutingDriver):
     def _do_set_ha_hsrp(self, sub_interface, vrf_name, priority, group,
                         ip, vlan):
         conf_str = asr1k_snippets.SET_INTC_ASR_HSRP_EXTERNAL % (sub_interface,
-             group, priority, group, ip, group, group, group, vlan)
+                                                                group,
+                                                                priority,
+                                                                group, ip,
+                                                                group, group,
+                                                                group, vlan)
         self._edit_running_config(conf_str, 'SET_INTC_ASR_HSRP_EXTERNAL')
 
     def _create_sub_interface_v6(self, ri, port, is_external=False, gw_ip=""):
