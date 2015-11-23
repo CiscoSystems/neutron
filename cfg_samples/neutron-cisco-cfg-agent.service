@@ -1,0 +1,12 @@
+[Unit]
+Description=OpenStack Neutron Cisco Config Agent
+After=syslog.target network.target
+
+[Service]
+Type=simple
+User=neutron
+ExecStart=/usr/bin/neutron-cisco-cfg-agent --config-file /usr/share/neutron/neutron-dist.conf --config-file /etc/neutron/neutron.conf --config-file /etc/neutron/plugins/cisco/cisco_cfg_agent.ini --config-file /etc/neutron/plugins/cisco/cisco_device_manager_plugin.ini --config-file /etc/neutron/plugins/cisco/cisco_router_plugin.ini --log-file /var/log/neutron/cisco-cfg-agent.log
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
