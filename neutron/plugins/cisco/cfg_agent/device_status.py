@@ -172,12 +172,12 @@ class DeviceStatus(object):
         if _is_pingable(hd_mgmt_ip):
             LOG.debug("Hosting device: %(hd_id)s@%(ip)s is reachable.",
                       {'hd_id': hd_id, 'ip': hd_mgmt_ip})
-            hd['hd_state'] = 'Active'
+            hd['hd_state'] = cc.HD_ACTIVE
             ret_val = True
         else:
             LOG.debug("Hosting device: %(hd_id)s@%(ip)s is NOT reachable.",
                       {'hd_id': hd_id, 'ip': hd_mgmt_ip})
-            hd['hd_state'] = 'Unknown'
+            hd['hd_state'] = cc.HD_NOT_RESPONDING
             ret_val = False
 
         if (self.enable_heartbeat is True or ret_val is False):
