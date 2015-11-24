@@ -20,7 +20,7 @@ from oslo_utils import timeutils
 
 from neutron.agent.linux import utils as linux_utils
 from neutron.i18n import _LI
-from neutron.il8n import _LW
+from neutron.i18n import _LW
 from neutron.plugins.cisco.cfg_agent import cfg_exceptions
 import neutron.plugins.cisco.common.cisco_constants as cc
 import pprint
