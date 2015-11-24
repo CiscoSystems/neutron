@@ -1,0 +1,14 @@
+[Unit]
+Description=OpenStack Neutron Server
+After=syslog.target network.target
+
+[Service]
+Type=notify
+User=neutron
+ExecStart=/usr/bin/neutron-server --config-file /usr/share/neutron/neutron-dist.conf --config-dir /usr/share/neutron/server --config-file /etc/neutron/neutron.conf --config-file /etc/neutron/plugin.ini --config-file /etc/neutron/plugins/cisco/cisco_router_plugin.ini --config-file /etc/neutron/plugins/cisco/cisco_device_manager_plugin.ini --config-file /etc/neutron/plugins/cisco/cisco_cfg_agent.ini  --config-dir /etc/neutron/conf.d/neutron-server --log-file /var/log/neutron/server.log
+PrivateTmp=true
+NotifyAccess=all
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
