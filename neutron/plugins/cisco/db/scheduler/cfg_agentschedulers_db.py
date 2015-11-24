@@ -30,7 +30,7 @@ LOG = logging.getLogger(__name__)
 
 
 COMPOSITE_AGENTS_SCHEDULER_OPTS = [
-    cfg.IntOpt('cfg_agent_down_time', default=60,
+    cfg.IntOpt('cfg_agent_down_time', default=30,
                help=_('Seconds of no status update until a cfg agent '
                       'is considered down.')),
     cfg.StrOpt('configuration_agent_scheduler_driver',
