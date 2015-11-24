@@ -266,7 +266,7 @@ class DeviceStatus(object):
                         driver.send_empty_cfg()
                         LOG.debug("Dead hosting devices revived %s" %
                               (pprint.pformat(hd)))
-                        hd['hd_state'] = cc.ACTIVE
+                        hd['hd_state'] = cc.HD_ACTIVE
                         response_dict['revived'].append(hd_id)
                     except cfg_exceptions.DriverException as e:
                         LOG.debug("netconf not ready on device yet."
