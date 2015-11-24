@@ -14,10 +14,12 @@
 #
 
 from oslo_config import cfg
+from oslo_log import log as logging
 from oslo_utils import importutils
 
 from neutron.common import rpc as n_rpc
 from neutron import manager
+from neutron.openstack.common import loopingcall
 import neutron.plugins
 from neutron.plugins.cisco.common import cisco_constants as c_constants
 from neutron.plugins.cisco.db.device_manager import (hosting_device_manager_db
@@ -29,6 +31,8 @@ from neutron.plugins.cisco.device_manager.rpc import (devices_cfgagent_rpc_cb
 from neutron.plugins.cisco.device_manager.rpc import devmgr_rpc_cfgagent_api
 from neutron.plugins.cisco.extensions import ciscocfgagentscheduler
 from neutron.plugins.cisco.extensions import ciscohostingdevicemanager
+
+LOG = logging.getLogger(__name__)
 
 
 class CiscoDeviceManagerPlugin(dev_mgr_db.HostingDeviceManagerMixin,
@@ -58,6 +62,7 @@ class CiscoDeviceManagerPlugin(dev_mgr_db.HostingDeviceManagerMixin,
             cfg.CONF.set_override('api_extensions_path', cp + to_add)
         self.cfg_agent_scheduler = importutils.import_object(
             cfg.CONF.general.configuration_agent_scheduler_driver)
+        self._setup_cfg_agent_monitoring()
 
     def setup_rpc(self):
         # RPC support
@@ -68,6 +73,13 @@ class CiscoDeviceManagerPlugin(dev_mgr_db.HostingDeviceManagerMixin,
         self.endpoints = [devices_rpc.DeviceMgrCfgRpcCallback(self)]
         self.conn.create_consumer(self.topic, self.endpoints, fanout=False)
         self.conn.consume_in_threads()
+
+    def _setup_cfg_agent_monitoring(self):
+        LOG.debug('Activating periodic config agent monitor')
+        self._heartbeat = loopingcall.FixedIntervalLoopingCall(
+            self._check_config_agents)
+        self._heartbeat.start(
+            interval=cfg.CONF.general.cfg_agent_monitoring_interval)
 
     @property
     def _core_plugin(self):
