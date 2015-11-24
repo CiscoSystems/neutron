@@ -192,8 +192,8 @@ class CfgAgentSchedulerDbMixin(
                             context, hosting_device_db, agent_db)
                         agents.append(agent_db)
                         try:
-                            agent_assigned_hd_ids[agent_db.id].append(
-                                hosting_device_db.id)
+                            agent_assigned_hd_ids[agent_db.id][
+                                'hd_ids'].append(hosting_device_db.id)
                         except KeyError:
                             agent_assigned_hd_ids[agent_db.id] = {
                                 'agent_host': agent_db.host,
@@ -281,7 +281,8 @@ class CfgAgentSchedulerDbMixin(
                     self._bind_hosting_device_to_cfg_agent(context, hd_db,
                                                            agent_db)
                     try:
-                        agent_assigned_hd_ids[agent_db.id].append(hd_db.id)
+                        agent_assigned_hd_ids[agent_db.id]['hd_ids'].append(
+                            hd_db.id)
                     except KeyError:
                         agent_assigned_hd_ids[agent_db.id] = {
                             'agent_host': agent_db.host,
