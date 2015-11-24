@@ -246,8 +246,24 @@ class RoutingServiceHelper(object):
                 if self.sync_devices:
                     sync_devices_list = list(self.sync_devices)
                     LOG.debug("Fetching routers on:%s", sync_devices_list)
-                    routers.extend(self._fetch_router_info(
-                        device_ids=sync_devices_list))
+
+                    fetched_routers = self._fetch_router_info(
+                        device_ids=sync_devices_list)
+
+                    LOG.debug("Fetched routers :%s",
+                              pp.pformat(fetched_routers))
+                    # clear router_config cache
+                    for router_dict in fetched_routers:
+                        self.update_routers.discard(router_dict['id'])
+                        self.removed_routers.discard(router_dict['id'])
+                        LOG.debug("invoking _router_removed(%s)",
+                                  router_dict['id'])
+                        self._router_removed(router_dict['id'],
+                                             deconfigure=False)
+
+                    self._cleanup_invalid_cfg(fetched_routers)
+
+                    routers.extend(fetched_routers)
                     self.sync_devices.clear()
                 if removed_devices_info:
                     if removed_devices_info.get('deconfigure'):

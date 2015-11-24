@@ -247,7 +247,8 @@ class CiscoCfgAgent(manager.Manager):
         :param context: RPC context
         :return: None
         """
-        res = self._dev_status.check_backlogged_hosting_devices()
+        driver_mgr = self.get_routing_service_helper().driver_manager
+        res = self._dev_status.check_backlogged_hosting_devices(driver_mgr)
         if res['reachable']:
             self.process_services(device_ids=res['reachable'])
         if res['revived']:

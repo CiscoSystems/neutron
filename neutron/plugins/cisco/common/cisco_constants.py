@@ -143,6 +143,9 @@ HD_ERROR = 'ERROR'
 # Dead means that hosting device has been determined to be dead in that it
 # does not respond to pings even given multiple, repeated attempts
 HD_DEAD = 'DEAD'
+# Initializing means the hosting device is pingable, but not ready for
+# configureation
+HD_INIT = 'INIT'
 
 # Routing service
 # ==============
