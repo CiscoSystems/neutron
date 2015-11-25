@@ -634,7 +634,7 @@ class ConfigSyncer(object):
             #gw_net_id = gw_port['network_id']
             #gw_hsrp_num = self._get_hsrp_grp_num_from_net_id(gw_net_id)
             gw_hsrp_num = int(gw_port['ha_info']['group'])
-            gw_segment_id = gw_port['hosting_info']['segmentation_id']
+            gw_segment_id = int(gw_port['hosting_info']['segmentation_id'])
             if segment_id != gw_segment_id:
                 LOG.info(_LI("snat segment_id does not match router's"
                          " gw segment_id, deleting"))
@@ -743,7 +743,7 @@ class ConfigSyncer(object):
                         constants.DEVICE_OWNER_ROUTER_INTF:
 
                         intf_segment_id = \
-                            intf['hosting_info']['segmentation_id']
+                            int(intf['hosting_info']['segmentation_id'])
                         if intf_segment_id == segment_id:
                             intf_match_found = True
                             break
@@ -831,7 +831,7 @@ class ConfigSyncer(object):
                         continue
             else:
                 segment_id = match_obj.group(1)
-            segment_id = int(segment_id)
+            segment_id = segment_id
             LOG.info(_LI("   segment_id: %(seg_id)s") % {'seg_id': segment_id})
 
             # Check that segment_id exists in openstack DB info
@@ -1038,7 +1038,7 @@ class ConfigSyncer(object):
         # TODO(split this big function into smaller functions)
         for intf in runcfg_intfs:
             LOG.info(_LI("\nOpenstack interface: %s"), (intf))
-            intf.segment_id = int(intf.re_match(INTF_REGEX, group=1))
+            intf.segment_id = intf.re_match(INTF_REGEX, group=1)
             LOG.info(_LI("  segment_id: %s"), (intf.segment_id))
 
             # Delete any interfaces where config doesn't match DB
@@ -1063,7 +1063,7 @@ class ConfigSyncer(object):
                 continue
             else:
                 dot1q_num = int(dot1q_cfg.re_match(DOT1Q_REGEX, group=1))
-                if dot1q_num != intf.segment_id:
+                if dot1q_num != int(intf.segment_id):
                     LOG.info(_LI("DOT1Q mismatch, delete interface"))
                     pending_delete_list.append(intf)
                     continue
