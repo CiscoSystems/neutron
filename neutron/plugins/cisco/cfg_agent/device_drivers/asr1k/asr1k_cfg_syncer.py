@@ -14,7 +14,7 @@
 
 import ciscoconfparse
 import netaddr
-
+import pprint as pp
 from oslo_config import cfg
 
 from neutron.common import constants
@@ -300,13 +300,14 @@ class ConfigSyncer(object):
                                        intf_segment_dict,
                                        segment_nat_dict,
                                        parsed_cfg)
-
         invalid_cfg += self.clean_interfaces(conn,
                                              intf_segment_dict,
                                              segment_nat_dict,
                                              parsed_cfg)
 
         invalid_cfg += self.clean_vrfs(conn, router_id_dict, parsed_cfg)
+
+        LOG.debug("invalid_cfg = %s" % pp.pformat(invalid_cfg))
 
         return invalid_cfg
 
@@ -538,7 +539,7 @@ class ConfigSyncer(object):
 
             gw_port = router['gw_port']
             gw_segment_id = gw_port['hosting_info']['segmentation_id']
-            if segment_id != gw_segment_id:
+            if int(segment_id) != gw_segment_id:
                 LOG.info(_LI("route segment_id does not match router's gw"
                          " segment_id, deleting"))
                 delete_route_list.append(route.text)
@@ -821,7 +822,7 @@ class ConfigSyncer(object):
 
             if (is_multi_region_enabled):
                 region_id = match_obj.group(1)
-                segment_id = match_obj.group(2)
+                segment_id = int(match_obj.group(2))
                 if region_id != cfg.CONF.multi_region.region_id:
                     if region_id not in cfg.CONF.multi_region.other_region_ids:
                         delete_acl_list.append(acl.text)
@@ -1038,7 +1039,7 @@ class ConfigSyncer(object):
         # TODO(split this big function into smaller functions)
         for intf in runcfg_intfs:
             LOG.info(_LI("\nOpenstack interface: %s"), (intf))
-            intf.segment_id = intf.re_match(INTF_REGEX, group=1)
+            intf.segment_id = int(intf.re_match(INTF_REGEX, group=1))
             LOG.info(_LI("  segment_id: %s"), (intf.segment_id))
 
             # Delete any interfaces where config doesn't match DB
@@ -1048,6 +1049,7 @@ class ConfigSyncer(object):
             # TODO(that specified in .ini file)
 
             # Check that the interface segment_id exists in the current DB data
+            LOG.debug("intf_segment_dict = %s" % pp.pformat(intf_segment_dict))
             if intf.segment_id not in intf_segment_dict:
                 LOG.info(_LI("Invalid segment ID, delete interface"))
                 pending_delete_list.append(intf)
