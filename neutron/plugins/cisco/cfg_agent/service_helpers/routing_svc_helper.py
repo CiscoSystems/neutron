@@ -239,10 +239,7 @@ class RoutingServiceHelper(object):
                     LOG.debug("Updated routers:%s", router_ids)
                     self.updated_routers.clear()
                     routers = self._fetch_router_info(router_ids=router_ids)
-                    LOG.debug("Updated routers:%s" % (pp.pformat(routers)))
-
-                    LOG.debug("invoking cleanup invalid config")
-                    self._cleanup_invalid_cfg(routers)
+                    LOG.debug("Updated routers:\n%s" % (pp.pformat(routers)))
                 if device_ids:
                     LOG.debug("Adding new devices:%s", device_ids)
                     self.sync_devices = set(device_ids) | self.sync_devices

@@ -266,9 +266,9 @@ class CiscoCfgAgent(manager.Manager):
                       res['revived'])
             # trigger a sync only on the revived hosting-devices
             if self.conf.cfg_agent.enable_heartbeat is True:
-                self.process_services(device_ids=res['revived'])
                 self.devmgr_rpc.report_revived_hosting_devices(
                     context, hd_ids=res['revived'])
+                self.process_services(device_ids=res['revived'])
         if res['dead']:
             LOG.debug("Reporting dead hosting devices: %s", res['dead'])
             self.devmgr_rpc.report_dead_hosting_devices(context,
