@@ -306,7 +306,7 @@ class ConfigSyncer(object):
                                              parsed_cfg)
 
         invalid_cfg += self.clean_vrfs(conn, router_id_dict, parsed_cfg)
-
+        LOG.debug("invalid_cfg = %s " % (pp.pformat(invalid_cfg)))
         return invalid_cfg
 
     def get_running_config(self, conn):
@@ -833,8 +833,7 @@ class ConfigSyncer(object):
                         # this configuration
                         continue
             else:
-                segment_id = match_obj.group(1)
-            segment_id = segment_id
+                segment_id = int(match_obj.group(1))
             LOG.info(_LI("   segment_id: %(seg_id)s") % {'seg_id': segment_id})
 
             # Check that segment_id exists in openstack DB info
