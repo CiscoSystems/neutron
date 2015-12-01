@@ -307,8 +307,6 @@ class ConfigSyncer(object):
 
         invalid_cfg += self.clean_vrfs(conn, router_id_dict, parsed_cfg)
 
-        LOG.debug("invalid_cfg = %s" % pp.pformat(invalid_cfg))
-
         return invalid_cfg
 
     def get_running_config(self, conn):
