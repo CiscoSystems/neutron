@@ -385,6 +385,7 @@ class ConfigSyncer(object):
                 confstr = asr_snippets.REMOVE_VRF_DEFN % vrf_name
                 conn.edit_config(target='running', config=confstr)
 
+        LOG.debug("invalid_vrfs = %s" % (pp.pformat(invalid_vrfs)))
         return invalid_vrfs
 
     def get_single_cfg(self, cfg_line):
@@ -478,7 +479,7 @@ class ConfigSyncer(object):
                 confstr = XML_FREEFORM_SNIPPET % (del_cmd)
                 LOG.info(_LI("Delete pool: %s"), del_cmd)
                 conn.edit_config(target='running', config=confstr)
-
+        LOG.debug("delete_pool_list = %s " % (pp.pformat(delete_pool_list)))
         return delete_pool_list
 
     def clean_default_route(self,
@@ -562,6 +563,7 @@ class ConfigSyncer(object):
                          {'del_cmd': del_cmd})
                 conn.edit_config(target='running', config=confstr)
 
+        LOG.debug("delete_route_list = %s " % (pp.pformat(delete_route_list)))
         return delete_route_list
 
     def clean_snat(self, conn, router_id_dict,
@@ -677,6 +679,7 @@ class ConfigSyncer(object):
                          {'del_cmd': del_cmd})
                 conn.edit_config(target='running', config=confstr)
 
+        LOG.debug("delete_fip_list = %s " % (pp.pformat(delete_fip_list)))
         return delete_fip_list
 
     def clean_nat_pool_overload(self,
@@ -765,6 +768,7 @@ class ConfigSyncer(object):
                          {'del_cmd': del_cmd})
                 conn.edit_config(target='running', config=confstr)
 
+        LOG.debug("delete_nat_list = %s " % (pp.pformat(delete_nat_list)))
         return delete_nat_list
 
     def check_acl_permit_rules_valid(self, segment_id, acl, intf_segment_dict):
@@ -857,6 +861,7 @@ class ConfigSyncer(object):
                 LOG.info(_LI("Delete ACL: %(del_cmd)s") % {'del_cmd': del_cmd})
                 conn.edit_config(target='running', config=confstr)
 
+        LOG.debug("delete_acl_list = %s" % (pp.pformat(delete_acl_list)))
         return delete_acl_list
 
     def subintf_real_ip_check(self, intf_list, is_external, ip_addr, netmask):
@@ -1175,4 +1180,6 @@ class ConfigSyncer(object):
                 #LOG.info(confstr)
                 conn.edit_config(target='running', config=confstr)
 
+        LOG.debug("pending_delete_list (interfaces) = %s" %
+                  (pp.pformat(pending_delete_list)))
         return pending_delete_list
