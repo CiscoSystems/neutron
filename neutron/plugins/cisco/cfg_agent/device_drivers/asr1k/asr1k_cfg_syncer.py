@@ -452,7 +452,9 @@ class ConfigSyncer(object):
                 router['gw_port']['subnets'][0]['cidr'])
 
             if start_ip != pool_ip:
-                LOG.info(_LI("start IP for pool does not match, deleting"))
+                LOG.info(_LI("start IP %(start_ip)s for "
+                             " pool does not match %(pool_ip)s, deleting") %
+                         {'start_ip': start_ip, 'pool_ip': pool_ip})
                 delete_pool_list.append(pool.text)
                 continue
 
