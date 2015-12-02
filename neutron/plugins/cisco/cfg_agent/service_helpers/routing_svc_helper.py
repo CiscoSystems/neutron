@@ -164,6 +164,7 @@ class RoutingServiceHelper(object):
         self.updated_routers = set()
         self.removed_routers = set()
         self.sync_devices = set()
+        self.sync_devices_attempts = 0
         self.fullsync = True
         self.topic = '%s.%s' % (c_constants.CFG_AGENT_L3_ROUTING, host)
 
@@ -257,19 +258,47 @@ class RoutingServiceHelper(object):
 
                     LOG.debug("Fetched routers :%s",
                               pp.pformat(fetched_routers))
-                    # clear router_config cache
-                    for router_dict in fetched_routers:
-                        self.update_routers.discard(router_dict['id'])
-                        self.removed_routers.discard(router_dict['id'])
-                        LOG.debug("invoking _router_removed(%s)",
-                                  router_dict['id'])
-                        self._router_removed(router_dict['id'],
-                                             deconfigure=False)
+                    if fetched_routers:
+                        # clear router_config cache
+                        for router_dict in fetched_routers:
+                            self.updated_routers.discard(router_dict['id'])
+                            self.removed_routers.discard(router_dict['id'])
+                            LOG.debug("invoking _router_removed(%s)",
+                                      router_dict['id'])
+                            self._router_removed(router_dict['id'],
+                                                 deconfigure=False)
 
-                    self._cleanup_invalid_cfg(fetched_routers)
+                        self._cleanup_invalid_cfg(fetched_routers)
 
-                    routers.extend(fetched_routers)
-                    self.sync_devices.clear()
+                        routers.extend(fetched_routers)
+                        self.sync_devices.clear()
+                    else:
+                        # If the initial attempt to sync a device
+                        # failed, retry again (by not clearing sync_devices)
+                        # Normal updated_routers processing is still allowed
+                        # to happen
+                        self.sync_devices_attempts = (
+                            self.sync_devices_attempts + 1)
+
+                        if (self.sync_devices_attempts >=
+                            c_constants.MAX_DEVICE_SYNC_ATTEMPTS):
+
+                            LOG.debug("Max number [%d / %d ] of sync_devices "
+                                      "attempted.  No further retries will "
+                                      "be attempted." %
+                                      (self.sync_devices_attempts,
+                                       c_constants.MAX_DEVICE_SYNC_ATTEMPTS))
+                            self.sync_devices_attempts.clear()
+                            self.sync_devices_attempts = 0
+                        else:
+                            LOG.debug("Fetched routers was blank for sync"
+                                      " attempt [%d / %d], will attempt "
+                                      "resync of %s devices again in"
+                                      " the next iteration" %
+                                      (self.sync_devices_attempts,
+                                       c_constants.MAX_DEVICE_SYNC_ATTEMPTS,
+                                       pp.pformat(self.sync_devices)))
+
                 if removed_devices_info:
                     if removed_devices_info.get('deconfigure'):
                         ids = self._get_router_ids_from_removed_devices_info(

@@ -260,6 +260,15 @@ class CiscoCfgAgent(manager.Manager):
                            inform device manager that the hosting
                            device is non-responding
 
+        As additional note for the revived case:
+            Although the plugin was notified, there may be some lag
+            before the plugin actually can reschedule it's backlogged routers.
+
+            If process_services(device_ids...) isn't successful initially,
+            subsequent device syncs will be attempted until
+            MAX_DEVICE_SYNC_ATTEMPTS occurs.  Main process_service task
+            will resume if sync_devices is populated.
+
         :param context: RPC context
         :return: None
         """
