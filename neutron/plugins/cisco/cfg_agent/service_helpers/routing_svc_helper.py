@@ -251,19 +251,21 @@ class RoutingServiceHelper(object):
                     self.sync_devices = set(device_ids) | self.sync_devices
                 if self.sync_devices:
                     sync_devices_list = list(self.sync_devices)
-                    LOG.debug("Fetching routers on:%s", sync_devices_list)
+                    LOG.debug("Fetching routers on devices :%s",
+                              sync_devices_list)
 
                     fetched_routers = self._fetch_router_info(
                         device_ids=sync_devices_list)
 
-                    LOG.debug("Fetched routers :%s",
-                              pp.pformat(fetched_routers))
                     if fetched_routers:
+                        LOG.debug("[sync_devices] Fetched routers :%s",
+                                  pp.pformat(fetched_routers))
                         # clear router_config cache
                         for router_dict in fetched_routers:
                             self.updated_routers.discard(router_dict['id'])
                             self.removed_routers.discard(router_dict['id'])
-                            LOG.debug("invoking _router_removed(%s)",
+                            LOG.debug("[sync_devices] invoking "
+                                      "_router_removed(%s)",
                                       router_dict['id'])
                             self._router_removed(router_dict['id'],
                                                  deconfigure=False)
@@ -271,7 +273,10 @@ class RoutingServiceHelper(object):
                         self._cleanup_invalid_cfg(fetched_routers)
 
                         routers.extend(fetched_routers)
+                        LOG.debug("[sync_devices] %s finished",
+                                  sync_devices_list)
                         self.sync_devices.clear()
+
                     else:
                         # If the initial attempt to sync a device
                         # failed, retry again (by not clearing sync_devices)
