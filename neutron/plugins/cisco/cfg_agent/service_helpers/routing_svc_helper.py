@@ -293,7 +293,7 @@ class RoutingServiceHelper(object):
                                       "be attempted." %
                                       (self.sync_devices_attempts,
                                        c_constants.MAX_DEVICE_SYNC_ATTEMPTS))
-                            self.sync_devices_attempts.clear()
+                            self.sync_devices.clear()
                             self.sync_devices_attempts = 0
                         else:
                             LOG.debug("Fetched routers was blank for sync"
