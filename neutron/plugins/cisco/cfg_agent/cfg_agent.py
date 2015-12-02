@@ -88,6 +88,39 @@ class CiscoDeviceManagementApi(object):
                           'get_hosting_devices_for_agent',
                           host=self.host)
 
+CFG_AGENT_OPTS = [
+        cfg.IntOpt('rpc_loop_interval', default=10,
+                   help=_("Interval when the process_services() loop "
+                          "executes in seconds. This is when the config agent "
+                          "lets each service helper to process its neutron "
+                          "resources.")),
+        cfg.StrOpt('routing_svc_helper_class',
+                   default='neutron.plugins.cisco.cfg_agent.service_helpers'
+                           '.routing_svc_helper.RoutingServiceHelper',
+                   help=_("Path of the routing service helper class.")),
+        cfg.BoolOpt('enable_heartbeat',
+                    default=True,
+                    help=_("If enabled, the agent will maintain a heartbeat "
+                           "against its hosting-devices. If a device dies "
+                           "and recovers, the agent will then trigger a "
+                           "configuration resync.")),
+        cfg.IntOpt('heartbeat_interval', default=5,
+                   help=_("Interval in seconds when the config agent runs the "
+                          "backlog / hosting-device heart beat task.")),
+        cfg.IntOpt('keepalive_interval', default=10,
+                   help=_("Interval in seconds when the config agent sents a "
+                          "timestamp to the plugin to say that it is alive.")),
+        cfg.IntOpt('report_iteration', default=6,
+                   help=_("The iteration where the config agent sends a full "
+                          "status report to the plugin.The default is every "
+                          "6th iteration of the keep alive interval. This "
+                          "means with default value of keepalive_interval "
+                          "(10sec), a full report is sent once every "
+                          "6*10 = 60 seconds")),
+]
+
+cfg.CONF.register_opts(CFG_AGENT_OPTS, "cfg_agent")
+
 
 class CiscoCfgAgent(manager.Manager):
     """Cisco Cfg Agent.
@@ -111,33 +144,6 @@ class CiscoCfgAgent(manager.Manager):
     """
     target = oslo_messaging.Target(version='1.1')
 
-    OPTS = [
-        cfg.IntOpt('rpc_loop_interval', default=10,
-                   help=_("Interval when the process_services() loop "
-                          "executes in seconds. This is when the config agent "
-                          "lets each service helper to process its neutron "
-                          "resources.")),
-        cfg.StrOpt('routing_svc_helper_class',
-                   default='neutron.plugins.cisco.cfg_agent.service_helpers'
-                           '.routing_svc_helper.RoutingServiceHelper',
-                   help=_("Path of the routing service helper class.")),
-        cfg.BoolOpt('enable_heartbeat',
-                    default=True,
-                    help=_("If enabled, the agent will maintain a heartbeat "
-                           "against its hosting-devices. If a device dies "
-                           "and recovers, the agent will then trigger a "
-                           "configuration resync.")),
-        cfg.IntOpt('keepalive_interval', default=10,
-                   help=_("Interval in seconds when the config agent sents a "
-                          "timestamp to the plugin to say that it is alive.")),
-        cfg.IntOpt('report_iteration', default=6,
-                   help=_("The iteration where the config agent sends a full "
-                          "status report to the plugin.The default is every "
-                          "6th iteration of the keep alive interval. This "
-                          "means with default value of keepalive_interval "
-                          "(10sec), a full report is sent once every "
-                          "6*10 = 60 seconds")),
-    ]
 
     def __init__(self, host, conf=None):
         self.conf = conf or cfg.CONF
@@ -178,7 +184,7 @@ class CiscoCfgAgent(manager.Manager):
         return self.routing_service_helper
 
     ## Periodic tasks ##
-    @periodic_task.periodic_task(spacing=2)
+    @periodic_task.periodic_task(spacing=cfg.CONF.cfg_agent.heartbeat_interval)
     def _backlog_task(self, context):
         """Process backlogged devices."""
         LOG.debug("Processing backlog.")
@@ -463,7 +469,6 @@ class CiscoCfgAgentWithStateReport(CiscoCfgAgent):
 def main(manager='neutron.plugins.cisco.cfg_agent.'
                  'cfg_agent.CiscoCfgAgentWithStateReport'):
     conf = cfg.CONF
-    conf.register_opts(CiscoCfgAgent.OPTS, "cfg_agent")
     config.register_agent_state_opts_helper(conf)
     config.register_root_helper(conf)
     conf.register_opts(interface.OPTS)

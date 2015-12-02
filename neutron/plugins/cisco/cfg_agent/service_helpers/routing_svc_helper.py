@@ -216,6 +216,11 @@ class RoutingServiceHelper(object):
     def process_service(self, device_ids=None, removed_devices_info=None):
         try:
             LOG.debug("Routing service processing started")
+            LOG.debug("**** Updated routers:%s",
+                      pp.pformat(self.updated_routers))
+            LOG.debug("**** Removed routers:%s",
+                      pp.pformat(self.removed_routers))
+
             resources = {}
             routers = []
             removed_routers = []
