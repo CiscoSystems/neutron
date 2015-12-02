@@ -178,7 +178,7 @@ class CiscoCfgAgent(manager.Manager):
         return self.routing_service_helper
 
     ## Periodic tasks ##
-    @periodic_task.periodic_task
+    @periodic_task.periodic_task(spacing=2)
     def _backlog_task(self, context):
         """Process backlogged devices."""
         LOG.debug("Processing backlog.")

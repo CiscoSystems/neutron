@@ -236,7 +236,7 @@ class RoutingServiceHelper(object):
             else:
                 if self.updated_routers:
                     router_ids = list(self.updated_routers)
-                    LOG.debug("Updated routers:%s", router_ids)
+                    LOG.debug("Updated routers:%s", pp.pformat(router_ids))
                     self.updated_routers.clear()
                     routers = self._fetch_router_info(router_ids=router_ids)
                     LOG.debug("Updated routers:\n%s" % (pp.pformat(routers)))
@@ -272,7 +272,8 @@ class RoutingServiceHelper(object):
                         self.removed_routers = self.removed_routers | set(ids)
                 if self.removed_routers:
                     removed_routers_ids = list(self.removed_routers)
-                    LOG.debug("Removed routers:%s", removed_routers_ids)
+                    LOG.debug("Removed routers:%s",
+                              pp.pformat(removed_routers_ids))
                     for r in removed_routers_ids:
                         if r in self.router_info:
                             removed_routers.append(self.router_info[r].router)
