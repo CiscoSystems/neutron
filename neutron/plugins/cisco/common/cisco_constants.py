@@ -113,10 +113,6 @@ DEVICE_MANAGER = "DEVICE_MANAGER"
 # RPC topic for device manager
 DEVICE_MANAGER_PLUGIN = 'n-devmgr-plugin'
 
-# max number of sync devices attempts the cfg-agent/routing_svc_helper
-# will attempt
-MAX_DEVICE_SYNC_ATTEMPTS = 3
-
 # Type and topic for Cisco cfg agent
 # ==================================
 AGENT_TYPE_CFG = 'Cisco cfg agent'

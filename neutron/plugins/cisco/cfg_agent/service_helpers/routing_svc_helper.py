@@ -17,6 +17,7 @@ import eventlet
 import netaddr
 import pprint as pp
 
+from oslo_config import cfg
 from oslo_log import log as logging
 import oslo_messaging
 from oslo_utils import excutils
@@ -286,7 +287,7 @@ class RoutingServiceHelper(object):
                             self.sync_devices_attempts + 1)
 
                         if (self.sync_devices_attempts >=
-                            c_constants.MAX_DEVICE_SYNC_ATTEMPTS):
+                            cfg.CONF.cfg_agent.max_device_sync_attempts):
 
                             LOG.debug("Max number [%d / %d ] of sync_devices "
                                       "attempted.  No further retries will "

@@ -107,6 +107,8 @@ CFG_AGENT_OPTS = [
         cfg.IntOpt('heartbeat_interval', default=5,
                    help=_("Interval in seconds when the config agent runs the "
                           "backlog / hosting-device heart beat task.")),
+        cfg.IntOpt('max_device_sync_attempts', default=6,
+                   help=_("Maximum number of attempts for a device sync")),
         cfg.IntOpt('keepalive_interval', default=10,
                    help=_("Interval in seconds when the config agent sents a "
                           "timestamp to the plugin to say that it is alive.")),
