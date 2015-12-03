@@ -498,7 +498,7 @@ class RoutingServiceHelper(object):
                     continue
                 except cfg_exceptions.DriverException as e:
                     LOG.exception(_LE("Driver Exception on router:%(id)s. "
-                                      "Error is %(e)s"), {'id': r['id'], 
+                                      "Error is %(e)s"), {'id': r['id'],
                                                           'e': e})
                     self.updated_routers.update([r['id']])
                     continue
