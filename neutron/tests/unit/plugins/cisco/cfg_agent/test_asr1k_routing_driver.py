@@ -17,7 +17,6 @@ import sys
 
 import mock
 import netaddr
-from oslo_config import cfg
 from oslo_utils import uuidutils
 
 from neutron.common import constants as l3_constants

@@ -146,7 +146,6 @@ class CiscoCfgAgent(manager.Manager):
     """
     target = oslo_messaging.Target(version='1.1')
 
-
     def __init__(self, host, conf=None):
         self.conf = conf or cfg.CONF
         self._dev_status = device_status.DeviceStatus()

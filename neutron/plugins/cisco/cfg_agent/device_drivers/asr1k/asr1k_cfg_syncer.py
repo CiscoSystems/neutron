@@ -14,8 +14,8 @@
 
 import ciscoconfparse
 import netaddr
-import pprint as pp
 from oslo_config import cfg
+import pprint as pp
 
 from neutron.common import constants
 from neutron.i18n import _LI

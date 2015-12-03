@@ -497,7 +497,7 @@ class ASR1kRoutingDriver(iosxe_driver.IosXeRoutingDriver):
         try:
             self._edit_running_config(conf_str, 'SET_DYN_SRC_TRL_POOL')
         except Exception as dyn_nat_e:
-            LOG.info(_LE("Ignore exception for SET_DYN_SRC_TRL_POOL: %s."
+            LOG.info(_LI("Ignore exception for SET_DYN_SRC_TRL_POOL: %s."
                          "The config seems to be applied properly but netconf "
                          "seems to report an error."), dyn_nat_e)
 
