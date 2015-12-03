@@ -290,20 +290,20 @@ class RoutingServiceHelper(object):
                             cfg.CONF.cfg_agent.max_device_sync_attempts):
 
                             LOG.debug("Max number [%d / %d ] of sync_devices "
-                                      "attempted.  No further retries will "
-                                      "be attempted." %
-                                      (self.sync_devices_attempts,
-                                       c_constants.MAX_DEVICE_SYNC_ATTEMPTS))
+                                 "attempted.  No further retries will "
+                                 "be attempted." %
+                                 (self.sync_devices_attempts,
+                                 cfg.CONF.cfg_agent.max_device_sync_attempts))
                             self.sync_devices.clear()
                             self.sync_devices_attempts = 0
                         else:
                             LOG.debug("Fetched routers was blank for sync"
-                                      " attempt [%d / %d], will attempt "
-                                      "resync of %s devices again in"
-                                      " the next iteration" %
-                                      (self.sync_devices_attempts,
-                                       c_constants.MAX_DEVICE_SYNC_ATTEMPTS,
-                                       pp.pformat(self.sync_devices)))
+                                   " attempt [%d / %d], will attempt "
+                                   "resync of %s devices again in"
+                                   " the next iteration" %
+                                   (self.sync_devices_attempts,
+                                   cfg.CONF.cfg_agent.max_device_sync_attempts,
+                                   pp.pformat(self.sync_devices)))
 
                 if removed_devices_info:
                     if removed_devices_info.get('deconfigure'):
