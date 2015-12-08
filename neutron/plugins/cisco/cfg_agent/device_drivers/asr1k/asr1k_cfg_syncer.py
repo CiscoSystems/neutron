@@ -1047,6 +1047,7 @@ class ConfigSyncer(object):
             # check for region-id
             if (is_multi_region_enabled):
                 intf_desc = intf.re_search_children(intf_desc_regex)
+                intf_desc = self.get_single_cfg(intf_desc)
 
                 if (intf_desc is None):
                     LOG.info(_LI("Interface doesn't have "
