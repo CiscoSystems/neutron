@@ -39,6 +39,7 @@ def prepare_router_data(enable_snat=None, num_internal_ports=1):
     router_id = _uuid()
     ex_gw_port = {'id': _uuid(),
                   'network_id': _uuid(),
+                  'admin_state_up': True,
                   'fixed_ips': [{'ip_address': '19.4.4.4',
                                  'subnet_id': _uuid()}],
                   'subnets': [{'cidr': '19.4.4.0/24',
@@ -52,7 +53,7 @@ def prepare_router_data(enable_snat=None, num_internal_ports=1):
                                          'subnet_id': _uuid()}],
                           'mac_address': 'ca:fe:de:ad:be:ef',
                           'subnets': [{'cidr': '35.4.%s.0/24' % i,
-                                     'gateway_ip': '35.4.%s.1' % i}]})
+                                       'gateway_ip': '35.4.%s.1' % i}]})
     hosting_device = {'id': _uuid(),
                       "name": "CSR1kv_template",
                       "booting_time": 300,
@@ -86,7 +87,7 @@ class TestRouterInfo(base.BaseTestCase):
                            'fixed_ips': [{'ip_address': '19.4.4.4',
                                           'subnet_id': _uuid()}],
                            'subnets': [{'cidr': '19.4.4.0/24',
-                                      'gateway_ip': '19.4.4.1'}]}
+                                        'gateway_ip': '19.4.4.1'}]}
         self.router = {'id': _uuid(),
                        'enable_snat': True,
                        'routes': [],
@@ -124,10 +125,11 @@ class TestBasicRoutingOperations(base.BaseTestCase):
         self.conf.register_opts(cfg_agent.CiscoCfgAgent.OPTS, "cfg_agent")
         self.ex_gw_port = {'id': _uuid(),
                            'network_id': _uuid(),
+                           'admin_state_up': True,
                            'fixed_ips': [{'ip_address': '19.4.4.4',
                                          'subnet_id': _uuid()}],
                            'subnets': [{'cidr': '19.4.4.0/24',
-                                      'gateway_ip': '19.4.4.1'}]}
+                                        'gateway_ip': '19.4.4.1'}]}
         self.hosting_device = {'id': "100",
                                'name': "CSR1kv_template",
                                'booting_time': 300,
@@ -135,13 +137,15 @@ class TestBasicRoutingOperations(base.BaseTestCase):
                                'management_ip_address': '20.0.0.5',
                                'protocol_port': 22,
                                'credentials': {'username': 'user',
-                                               "password": '4getme'},
+                                               'password': '4getme'},
                                }
         self.router = {
             'id': _uuid(),
             'enable_snat': True,
+            'admin_state_up': True,
             'routes': [],
             'gw_port': self.ex_gw_port,
+            routerrole.ROUTER_ROLE_ATTR: None,
             'hosting_device': self.hosting_device}
 
         self.agent = mock.Mock()
@@ -342,7 +346,7 @@ class TestBasicRoutingOperations(base.BaseTestCase):
 
         self.routing_helper._internal_network_removed.side_effect = mock.Mock(
             side_effect=RuntimeError)
-        ri.internal_ports[0]['admin_state_up'] = False
+        router[l3_constants.INTERFACE_KEY][0]['admin_state_up'] = False
         # The above port is set to down state, remove it.
         self.assertRaises(RuntimeError,
                           self.routing_helper._process_router,
