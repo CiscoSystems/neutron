@@ -20,6 +20,7 @@ import pprint as pp
 from neutron.common import constants
 from neutron.i18n import _LI
 from neutron.plugins.cisco.common import cisco_constants
+from neutron.plugins.cisco.extensions import ha
 from neutron.plugins.cisco.extensions import routerrole
 
 import re
@@ -33,6 +34,7 @@ from neutron.plugins.cisco.cfg_agent.device_drivers.asr1k import (
 from oslo_log import log as logging
 
 LOG = logging.getLogger(__name__)
+
 
 ROUTER_ROLE_ATTR = routerrole.ROUTER_ROLE_ATTR
 
@@ -411,8 +413,8 @@ class ConfigSyncer(object):
             LOG.info(_LI("\nNAT pool: %s"), (pool))
             match_obj = re.match(nat_pool_regex, pool.text)
             if (is_multi_region_enabled):
-                router_id, region_id, start_ip, end_ip, netmask = \
-                    match_obj.group(1, 2, 3, 4, 5)
+                router_id, region_id, start_ip, end_ip, netmask = (
+                    match_obj.group(1, 2, 3, 4, 5))
                 my_region_id = cfg.CONF.multi_region.region_id
                 other_region_ids = cfg.CONF.multi_region.other_region_ids
                 if region_id != my_region_id:
@@ -423,8 +425,8 @@ class ConfigSyncer(object):
                         # this configuration
                         continue
             else:
-                router_id, start_ip, end_ip, netmask = \
-                    match_obj.group(1, 2, 3, 4)
+                router_id, start_ip, end_ip, netmask = (
+                    match_obj.group(1, 2, 3, 4))
 
             # Check that VRF exists in openstack DB info
             if router_id not in router_id_dict:
@@ -453,7 +455,7 @@ class ConfigSyncer(object):
 
             if start_ip != pool_ip:
                 LOG.info(_LI("start IP %(start_ip)s for "
-                             " pool does not match %(pool_ip)s, deleting") %
+                             "pool does not match %(pool_ip)s, deleting") %
                          {'start_ip': start_ip, 'pool_ip': pool_ip})
                 delete_pool_list.append(pool.text)
                 continue
@@ -496,8 +498,8 @@ class ConfigSyncer(object):
             match_obj = re.match(route_regex, route.text)
             is_multi_region_enabled = cfg.CONF.multi_region.enable_multi_region
             if (is_multi_region_enabled):
-                router_id, region_id, segment_id, next_hop = \
-                    match_obj.group(1, 2, 3, 4)
+                router_id, region_id, segment_id, next_hop = (
+                    match_obj.group(1, 2, 3, 4))
                 LOG.info(_LI("    router_id: %(router_id)s,"
                              ", region_id: %(region_id)s, segment_id:"
                              " %(segment_id)s, next_hop: %(next_hop)s") %
@@ -515,8 +517,8 @@ class ConfigSyncer(object):
                         # this configuration
                         continue
             else:
-                router_id, segment_id, next_hop = \
-                    match_obj.group(1, 2, 3)
+                router_id, segment_id, next_hop = (
+                    match_obj.group(1, 2, 3))
 
             LOG.info(_LI("    router_id: %(router_id)s, segment_id:"
                          " %(segment_id)s, next_hop: %(next_hop)s") %
@@ -603,8 +605,8 @@ class ConfigSyncer(object):
                         # this configuration
                         continue
             else:
-                inner_ip, outer_ip, router_id, hsrp_num, segment_id = \
-                    match_obj.group(1, 2, 3, 4, 5)
+                inner_ip, outer_ip, router_id, hsrp_num, segment_id = (
+                    match_obj.group(1, 2, 3, 4, 5))
 
             segment_id = int(segment_id)
             hsrp_num = int(hsrp_num)
@@ -636,7 +638,7 @@ class ConfigSyncer(object):
             gw_port = router['gw_port']
             #gw_net_id = gw_port['network_id']
             #gw_hsrp_num = self._get_hsrp_grp_num_from_net_id(gw_net_id)
-            gw_hsrp_num = int(gw_port['ha_info']['group'])
+            gw_hsrp_num = int(gw_port[ha.HA_INFO]['group'])
             gw_segment_id = int(gw_port['hosting_info']['segmentation_id'])
             if segment_id != gw_segment_id:
                 LOG.info(_LI("snat segment_id does not match router's"
@@ -702,8 +704,8 @@ class ConfigSyncer(object):
                      {'nat_rule': nat_rule})
             match_obj = re.match(nat_pool_overload_regex, nat_rule.text)
             if (is_multi_region_enabled):
-                segment_id, pool_router_id, region_id, router_id = \
-                    match_obj.group(1, 2, 3, 4)
+                segment_id, pool_router_id, region_id, router_id = (
+                    match_obj.group(1, 2, 3, 4))
                 my_region_id = cfg.CONF.multi_region.region_id
                 other_region_ids = cfg.CONF.multi_region.other_region_ids
                 if region_id != my_region_id:
@@ -714,8 +716,8 @@ class ConfigSyncer(object):
                         # this configuration
                         continue
             else:
-                segment_id, pool_router_id, router_id = \
-                    match_obj.group(1, 2, 3)
+                segment_id, pool_router_id, router_id = (
+                    match_obj.group(1, 2, 3))
 
             segment_id = int(segment_id)
 
@@ -931,7 +933,7 @@ class ConfigSyncer(object):
 
     def subintf_hsrp_ip_check(self, intf_list, is_external, ip_addr):
         for target_intf in intf_list:
-            ha_intf = target_intf['ha_info']['ha_port']
+            ha_intf = target_intf[ha.HA_INFO]['ha_port']
             target_ip = ha_intf['fixed_ips'][0]['ip_address']
             LOG.info(_LI("target_ip: %(target_ip)s, actual_ip: %(ip_addr)s") %
                      {'target_ip': target_ip,
@@ -1161,7 +1163,7 @@ class ConfigSyncer(object):
 
             # self.existing_cfg_dict['interfaces'][intf.segment_id] = intf
 
-            correct_grp_num = int(db_intf['ha_info']['group'])
+            correct_grp_num = int(db_intf[ha.HA_INFO]['group'])
 
             if intf.has_ipv6 is False:
                 if self.clean_interfaces_nat_check(intf,

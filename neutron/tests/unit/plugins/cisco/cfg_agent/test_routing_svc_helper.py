@@ -27,6 +27,7 @@ from neutron.plugins.cisco.cfg_agent import cfg_agent
 from neutron.plugins.cisco.cfg_agent import cfg_exceptions
 from neutron.plugins.cisco.cfg_agent.service_helpers import (
     routing_svc_helper)
+from neutron.plugins.cisco.extensions import ha
 from neutron.plugins.cisco.extensions import routerrole
 
 
@@ -122,7 +123,7 @@ class TestBasicRoutingOperations(base.BaseTestCase):
         super(TestBasicRoutingOperations, self).setUp()
         self.conf = cfg.ConfigOpts()
         self.conf.register_opts(base_config.core_opts)
-        self.conf.register_opts(cfg_agent.CiscoCfgAgent.OPTS, "cfg_agent")
+        self.conf.register_opts(cfg_agent.CFG_AGENT_OPTS, "cfg_agent")
         self.ex_gw_port = {'id': _uuid(),
                            'network_id': _uuid(),
                            'admin_state_up': True,
@@ -327,6 +328,27 @@ class TestBasicRoutingOperations(base.BaseTestCase):
         self.assertNotIn(
             router[l3_constants.INTERFACE_KEY][0], ri.internal_ports)
 
+        # The unexpected exception has been fixed manually
+        self.routing_helper._internal_network_added.side_effect = None
+
+        # Failure will cause a retry next time, then were able to add the
+        # port to ri.internal_ports
+        self.routing_helper._process_router(ri)
+        self.assertIn(
+            router[l3_constants.INTERFACE_KEY][0], ri.internal_ports)
+
+    def test_process_router_internal_network_added_raises_HAMissingError(self):
+        router, ports = prepare_router_data()
+        router[ha.ENABLED] = True
+        ri = routing_svc_helper.RouterInfo(router['id'], router=router)
+        # raise RuntimeError to simulate that a HAParamsMissingException
+        params = {'r_id': FAKE_ID, 'p_id': FAKE_ID, 'port': ports[0]}
+        self.routing_helper._internal_network_added.side_effect = (
+            cfg_exceptions.HAParamsMissingException(**params))
+        self.routing_helper._process_router(ri)
+        self.assertIn(ri.router_id, self.routing_helper.updated_routers)
+        self.assertNotIn(
+            router[l3_constants.INTERFACE_KEY][0], ri.internal_ports)
         # The unexpected exception has been fixed manually
         self.routing_helper._internal_network_added.side_effect = None
 

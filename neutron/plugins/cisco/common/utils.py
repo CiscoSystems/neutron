@@ -19,7 +19,7 @@ import time
 from oslo_log import log as logging
 
 from neutron.common import exceptions as nexception
-from neutron.i18n import _LE, _LW
+from neutron.i18n import _LE
 
 LOG = logging.getLogger(__name__)
 
@@ -49,11 +49,16 @@ def retry(ExceptionToCheck, tries=4, delay=3, backoff=2):
                 try:
                     return f(*args, **kwargs)
                 except ExceptionToCheck as e:
-                    LOG.warn(_LW("%(ex)s, Retrying in %(delt)d seconds.."),
-                            {'ex': str(e), 'delt': mdelay})
+                    LOG.debug("%(err_mess)s. Retry calling function "
+                              "\'%(f_name)s\' in %(delta)d seconds.",
+                              {'err_mess': str(e), 'f_name': f.__name__,
+                               'delta': mdelay})
                     time.sleep(mdelay)
                     mtries -= 1
                     mdelay *= backoff
+            LOG.debug("Last retry calling function \'%(f_name)s\'.",
+                      {'err_mess': str(e), 'f_name': f.__name__,
+                       'delta': mdelay})
             return f(*args, **kwargs)
 
         return f_retry  # true decorator
