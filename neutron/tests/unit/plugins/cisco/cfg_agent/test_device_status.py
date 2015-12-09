@@ -138,9 +138,14 @@ class TestHostingDevice(base.BaseTestCase):
         expected = {'reachable': [],
                     'revived': [],
                     'dead': []}
-
+        drv_mgr = mock.MagicMock()
+        drv_mock = mock.MagicMock()
+        send_empty_cfg_mock = mock.MagicMock()
+        drv_mock.return_value.send_empty_cfg = send_empty_cfg_mock
+        drv_mgr.get_driver_for_hosting_device = drv_mock
         self.assertEqual(expected,
-                         self.status.check_backlogged_hosting_devices())
+                         self.status.check_backlogged_hosting_devices(drv_mgr))
+        self.assertEqual(send_empty_cfg_mock.call_count, 0)
 
     def test_check_backlog_below_booting_time(self):
         expected = {'reachable': [],
@@ -151,22 +156,27 @@ class TestHostingDevice(base.BaseTestCase):
         hd = self.hosting_device
         hd_id = hd['id']
         hd['hd_state'] = cc.HD_NOT_RESPONDING
-        self.status.backlog_hosting_devices[hd_id] = {'hd': hd,
-                                                      'routers': [
-                                                          self.router_id]
-                                                      }
-
-        self.assertEqual(expected,
-                         self.status.check_backlogged_hosting_devices())
+        self.status.backlog_hosting_devices[hd_id] = {
+            'hd': hd,
+            'routers': [self.router_id]}
+        drv_mgr = mock.MagicMock()
+        drv_mock = mock.MagicMock()
+        send_empty_cfg_mock = mock.MagicMock()
+        drv_mock.return_value.send_empty_cfg = send_empty_cfg_mock
+        drv_mgr.get_driver_for_hosting_device = drv_mock
+        self.assertEqual(self.status.check_backlogged_hosting_devices(drv_mgr),
+                         expected)
+        self.assertEqual(send_empty_cfg_mock.call_count, 0)
 
         #Simulate 20 seconds before boot time finishes
         self.hosting_device['created_at'] = create_timestamp(BOOT_TIME - 20)
-        self.assertEqual(self.status.check_backlogged_hosting_devices(),
+        self.assertEqual(self.status.check_backlogged_hosting_devices(drv_mgr),
                          expected)
+        self.assertEqual(send_empty_cfg_mock.call_count, 0)
 
         #Simulate 1 second before boot time
         self.hosting_device['created_at'] = create_timestamp(BOOT_TIME - 1)
-        self.assertEqual(self.status.check_backlogged_hosting_devices(),
+        self.assertEqual(self.status.check_backlogged_hosting_devices(drv_mgr),
                          expected)
 
     def test_check_backlog_above_booting_time_pingable(self):
@@ -182,14 +192,20 @@ class TestHostingDevice(base.BaseTestCase):
         # assumption in this scenario was that reachability to the
         # hosting-device was unknown
         hd['hd_state'] = cc.HD_NOT_RESPONDING
-        self.status.backlog_hosting_devices[hd_id] = {'hd': hd,
-                                                      'routers': [
-                                                          self.router_id]}
+        self.status.backlog_hosting_devices[hd_id] = {
+            'hd': hd,
+            'routers': [self.router_id]}
         expected = {'reachable': [hd_id],
                     'revived': [hd_id],
                     'dead': []}
+        drv_mgr = mock.MagicMock()
+        drv_mock = mock.MagicMock()
+        send_empty_cfg_mock = mock.MagicMock()
+        drv_mock.return_value.send_empty_cfg = send_empty_cfg_mock
+        drv_mgr.get_driver_for_hosting_device = drv_mock
         self.assertEqual(expected,
-                         self.status.check_backlogged_hosting_devices())
+                         self.status.check_backlogged_hosting_devices(drv_mgr))
+        self.assertEqual(drv_mgr.call_count, 0)
 
     def test_check_backlog_above_BT_not_pingable_below_deadtime(self):
         """Test for backlog processing in dead time interval.
@@ -205,14 +221,20 @@ class TestHostingDevice(base.BaseTestCase):
         hd_id = hd['id']
         device_status._is_pingable.return_value = False
         hd['hd_state'] = cc.HD_NOT_RESPONDING
-        self.status.backlog_hosting_devices[hd_id] = {'hd': hd,
-                                                      'routers': [
-                                                          self.router_id]}
+        self.status.backlog_hosting_devices[hd_id] = {
+            'hd': hd,
+            'routers': [self.router_id]}
         expected = {'reachable': [],
                     'revived': [],
                     'dead': []}
+        drv_mgr = mock.MagicMock()
+        drv_mock = mock.MagicMock()
+        send_empty_cfg_mock = mock.MagicMock()
+        drv_mock.return_value.send_empty_cfg = send_empty_cfg_mock
+        drv_mgr.get_driver_for_hosting_device = drv_mock
         self.assertEqual(expected,
-                         self.status.check_backlogged_hosting_devices())
+                         self.status.check_backlogged_hosting_devices(drv_mgr))
+        self.assertEqual(send_empty_cfg_mock.call_count, 0)
 
     def test_check_backlog_above_BT_not_pingable_aboveDeadTime(self):
         """Test for backlog processing after dead time interval.
@@ -230,16 +252,22 @@ class TestHostingDevice(base.BaseTestCase):
         hd_id = hd['id']
         device_status._is_pingable.return_value = False
         hd['hd_state'] = cc.HD_NOT_RESPONDING
-        self.status.backlog_hosting_devices[hd_id] = {'hd': hd,
-                                                      'routers': [
-                                                          self.router_id]}
+        self.status.backlog_hosting_devices[hd_id] = {
+            'hd': hd,
+            'routers': [self.router_id]}
         expected = {'reachable': [],
                     'revived': [],
                     'dead': [hd_id]}
+        drv_mgr = mock.MagicMock()
+        drv_mock = mock.MagicMock()
+        send_empty_cfg_mock = mock.MagicMock()
+        drv_mock.return_value.send_empty_cfg = send_empty_cfg_mock
+        drv_mgr.get_driver_for_hosting_device = drv_mock
         self.assertEqual(expected,
-                         self.status.check_backlogged_hosting_devices())
-        post_hd_state = \
-            self.status.backlog_hosting_devices[hd_id]['hd']['hd_state']
+                         self.status.check_backlogged_hosting_devices(drv_mgr))
+        self.assertEqual(send_empty_cfg_mock.call_count, 0)
+        post_hd_state = (
+            self.status.backlog_hosting_devices[hd_id]['hd']['hd_state'])
         self.assertEqual(cc.HD_DEAD, post_hd_state)
 
     def test_check_backlog_above_BT_resurrected_hosting_device(self):
@@ -256,35 +284,39 @@ class TestHostingDevice(base.BaseTestCase):
         hd_id = hd['id']
         device_status._is_pingable.return_value = False
         hd['hd_state'] = cc.HD_NOT_RESPONDING
-        self.status.backlog_hosting_devices[hd_id] = {'hd': hd,
-                                                      'routers': [
-                                                          self.router_id]}
+        self.status.backlog_hosting_devices[hd_id] = {
+            'hd': hd,
+            'routers': [self.router_id]}
         expected = {'reachable': [],
                     'revived': [],
                     'dead': [hd_id]}
+        drv_mgr = mock.MagicMock()
+        drv_mock = mock.MagicMock()
+        send_empty_cfg_mock = mock.MagicMock()
+        drv_mock.return_value.send_empty_cfg = send_empty_cfg_mock
+        drv_mgr.get_driver_for_hosting_device = drv_mock
         self.assertEqual(expected,
-                         self.status.check_backlogged_hosting_devices())
+                         self.status.check_backlogged_hosting_devices(drv_mgr))
+        self.assertEqual(send_empty_cfg_mock.call_count, 0)
 
-        post_hd_state = \
-            self.status.backlog_hosting_devices[hd_id]['hd']['hd_state']
-        self.assertEqual(cc.HD_DEAD,
-                         post_hd_state)
+        post_hd_state = (
+            self.status.backlog_hosting_devices[hd_id]['hd']['hd_state'])
+        self.assertEqual(cc.HD_DEAD, post_hd_state)
 
         # now simulate that the hosting device is resurrected
         self.assertEqual(1, len(self.status.get_backlogged_hosting_devices()))
         device_status._is_pingable.return_value = True
 
         expected = {'reachable': [],
-                    'revived': [],
+                    'revived': [hd_id],
                     'dead': []}
-
         self.assertEqual(expected,
-                         self.status.check_backlogged_hosting_devices())
+                         self.status.check_backlogged_hosting_devices(drv_mgr))
+        self.assertEqual(send_empty_cfg_mock.call_count, 1)
 
-        post_hd_state = \
-            self.status.backlog_hosting_devices[hd_id]['hd']['hd_state']
-        self.assertEqual(cc.HD_INIT,
-                         post_hd_state)
+        post_hd_state = (
+            self.status.backlog_hosting_devices[hd_id]['hd']['hd_state'])
+        self.assertEqual(cc.HD_ACTIVE, post_hd_state)
 
     def test_check_backlog_above_BT_revived_hosting_device(self):
         """
@@ -300,32 +332,37 @@ class TestHostingDevice(base.BaseTestCase):
         hd_id = hd['id']
         device_status._is_pingable.return_value = False
         hd['hd_state'] = cc.HD_NOT_RESPONDING
-        self.status.backlog_hosting_devices[hd_id] = {'hd': hd,
-                                                      'routers': [
-                                                          self.router_id]}
+        self.status.backlog_hosting_devices[hd_id] = {
+            'hd': hd,
+            'routers': [self.router_id]}
         expected = {'reachable': [],
                     'revived': [],
                     'dead': [hd_id]}
+        drv_mgr = mock.MagicMock()
+        drv_mock = mock.MagicMock()
+        send_empty_cfg_mock = mock.MagicMock()
+        drv_mock.return_value.send_empty_cfg = send_empty_cfg_mock
+        drv_mgr.get_driver_for_hosting_device = drv_mock
         self.assertEqual(expected,
-                         self.status.check_backlogged_hosting_devices())
+                         self.status.check_backlogged_hosting_devices(drv_mgr))
+        self.assertEqual(send_empty_cfg_mock.call_count, 0)
 
-        post_hd_state = \
-            self.status.backlog_hosting_devices[hd_id]['hd']['hd_state']
-        self.assertEqual(cc.HD_DEAD,
-                         post_hd_state)
+        post_hd_state = (
+            self.status.backlog_hosting_devices[hd_id]['hd']['hd_state'])
+        self.assertEqual(cc.HD_DEAD, post_hd_state)
 
         # now simulate that the hosting device is resurrected
         self.assertEqual(1, len(self.status.get_backlogged_hosting_devices()))
         device_status._is_pingable.return_value = True
 
         expected = {'reachable': [],
-                    'revived': [],
+                    'revived': [hd_id],
                     'dead': []}
 
         self.assertEqual(expected,
-                         self.status.check_backlogged_hosting_devices())
+                         self.status.check_backlogged_hosting_devices(drv_mgr))
+        self.assertEqual(send_empty_cfg_mock.call_count, 1)
 
-        post_hd_state = \
-            self.status.backlog_hosting_devices[hd_id]['hd']['hd_state']
-        self.assertEqual(cc.HD_INIT,
-                         post_hd_state)
+        post_hd_state = (
+            self.status.backlog_hosting_devices[hd_id]['hd']['hd_state'])
+        self.assertEqual(cc.HD_ACTIVE, post_hd_state)
