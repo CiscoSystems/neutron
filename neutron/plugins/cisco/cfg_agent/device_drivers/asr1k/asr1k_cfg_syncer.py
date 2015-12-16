@@ -118,7 +118,7 @@ NAT_POOL_OVERLOAD_REGEX = ("ip nat inside source list"
     NROUTER_REGEX +
     " overload")
 NAT_POOL_OVERLOAD_MULTI_REGION_REGEX = ("ip nat inside source"
-    " list neutron_acl_(\d+) pool " +
+    " list neutron_acl_(\w{1,7})_(\d+) pool " +
     NROUTER_MULTI_REGION_REGEX +
     "_nat_pool vrf " +
     NROUTER_MULTI_REGION_REGEX +
@@ -704,11 +704,12 @@ class ConfigSyncer(object):
                      {'nat_rule': nat_rule})
             match_obj = re.match(nat_pool_overload_regex, nat_rule.text)
             if (is_multi_region_enabled):
-                segment_id, pool_router_id, region_id, router_id = (
-                    match_obj.group(1, 2, 3, 4))
+                region_id, segment_id, pool_router_id, pool_region_id, \
+                    router_id = (match_obj.group(1, 2, 3, 4, 5))
                 my_region_id = cfg.CONF.multi_region.region_id
                 other_region_ids = cfg.CONF.multi_region.other_region_ids
-                if region_id != my_region_id:
+                if (region_id != pool_region_id and
+                    region_id != my_region_id):
                     if region_id not in other_region_ids:
                         delete_nat_list.append(nat_rule.text)
                     else:
