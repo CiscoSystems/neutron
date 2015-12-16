@@ -1090,7 +1090,6 @@ class ConfigSyncer(object):
             # TODO(that specified in .ini file)
 
             # Check that the interface segment_id exists in the current DB data
-            LOG.debug("intf_segment_dict = %s" % pp.pformat(intf_segment_dict))
             if intf.segment_id not in intf_segment_dict:
                 LOG.info(_LI("Invalid segment ID, delete interface"))
                 pending_delete_list.append(intf)
@@ -1152,7 +1151,17 @@ class ConfigSyncer(object):
                             # this configuration
                             continue
 
-                if router_id != db_intf["device_id"][0:6]:
+                # router_id device_id/ha_port_device_id check
+                if (ha.HA_INFO in db_intf):
+                    ha_port_device_id = \
+                        db_intf[ha.HA_INFO]['ha_port']['device_id']
+                else:
+                    ha_port_device_id = None
+
+                if (router_id != db_intf["device_id"][0:6] and
+                    (ha_port_device_id is not None and
+                     router_id != ha_port_device_id[0:6])):
+
                     LOG.info(_LI("Internal network VRF mismatch,"
                                  " deleting intf,"
                                  " router_id: %(router_id)s,"
