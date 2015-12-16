@@ -321,14 +321,48 @@ class L3RouterApplianceRouterTypeDriverTestCase(test_l3.L3NatTestCaseMixin,
 
 
 class L3RouterApplianceNamespaceTestCase(
-    test_l3.L3NatTestCaseBase, test_extraroute.ExtraRouteDBTestCaseBase,
-        L3RouterApplianceTestCaseBase):
+    L3RouterApplianceTestCaseBase,
+    test_l3.L3NatTestCaseBase, test_extraroute.ExtraRouteDBTestCaseBase):
 
     router_type = c_const.NAMESPACE_ROUTER_TYPE
 
     def test_floatingip_with_assoc_fails(self):
         self._test_floatingip_with_assoc_fails(
             'neutron.db.l3_db.L3_NAT_dbonly_mixin._check_and_get_fip_assoc')
+
+    def _check_driver_calls(self, func_name, num_teardown, num_setup):
+        with mock.patch.object(self.core_plugin,
+                               'get_hosting_device_plugging_driver') as m:
+            func = getattr(super(L3RouterApplianceNamespaceTestCase, self),
+                           func_name, None)
+            # call test case function
+            func()
+            drv = m.return_value
+            teardown_mock = drv.teardown_logical_port_connectivity
+            setup_mock = drv.setup_logical_port_connectivity
+            self.assertEqual(teardown_mock.call_count, num_teardown)
+            self.assertEqual(setup_mock.call_count, num_setup)
+
+    def test_router_update_gateway_with_external_ip_used_by_gw(self):
+        self._check_driver_calls(
+            'test_router_update_gateway_with_external_ip_used_by_gw', 0, 0)
+
+    def test_router_update_gateway_with_invalid_external_ip(self):
+        self._check_driver_calls(
+            'test_router_update_gateway_with_invalid_external_ip', 0, 0)
+
+    def test_router_update_gateway_with_invalid_external_subnet(self):
+        self._check_driver_calls(
+            'test_router_update_gateway_with_invalid_external_subnet', 0, 0)
+
+    def test_router_update_gateway_with_existed_floatingip(self):
+        self._check_driver_calls(
+            'test_router_update_gateway_with_existed_floatingip', 1, 1)
+
+    def test_router_update_gateway_to_empty_with_existed_floatingip(self):
+        self._check_driver_calls(
+            'test_router_update_gateway_to_empty_with_existed_floatingip', 1,
+            1)
 
 
 class L3RouterApplianceVMTestCase(L3RouterApplianceNamespaceTestCase):
