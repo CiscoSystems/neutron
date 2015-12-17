@@ -179,6 +179,9 @@ class ConfigSyncer(object):
         self.existing_cfg_dict['acls'] = {}
         self.existing_cfg_dict['routes'] = {}
         self.existing_cfg_dict['pools'] = {}
+
+        self.segment_gw_dict = {}
+
         router_id_dict, interface_segment_dict, segment_nat_dict = \
             self.process_routers_data(router_db_info)
         self.router_id_dict = router_id_dict
@@ -225,6 +228,13 @@ class ConfigSyncer(object):
             if 'gw_port' in router:
                 gw_port = router['gw_port']
                 gw_segment_id = gw_port['hosting_info']['segmentation_id']
+
+                if (router[ROUTER_ROLE_ATTR] ==
+                    cisco_constants.ROUTER_ROLE_GLOBAL):
+
+                    if (gw_segment_id not in self.segment_gw_dict):
+                        self.segment_gw_dict[gw_segment_id] = gw_port
+
                 if '_interfaces' in router:
                     interfaces = router['_interfaces']
                     for intf in interfaces:
@@ -866,6 +876,31 @@ class ConfigSyncer(object):
         LOG.debug("delete_acl_list = %s" % (pp.pformat(delete_acl_list)))
         return delete_acl_list
 
+    def subintf_real_ip_check_gw_port(self, gw_port, ip_addr, netmask):
+        """
+        checks running-cfg derived ip_addr and netmask against neutron-db
+        gw_port
+        """
+        ret_val = True
+        if (gw_port is not None):
+            target_ip = gw_port['fixed_ips'][0]['ip_address']
+            target_net = netaddr.IPNetwork(gw_port['subnets'][0]['cidr'])
+
+            if (ip_addr != target_ip):
+                LOG.info(_LI("Subintf real IP is incorrect, deleting"))
+                ret_val = False
+                return ret_val
+            if (netmask != str(target_net.netmask)):
+                LOG.info(_LI("Subintf has incorrect netmask, deleting"))
+                ret_val = False
+                return ret_val
+
+            ret_val = True
+        else:
+            ret_val = False
+
+        return ret_val
+
     def subintf_real_ip_check(self, intf_list, is_external, ip_addr, netmask):
 
         for target_intf in intf_list:
@@ -932,6 +967,26 @@ class ConfigSyncer(object):
 
         return False
 
+    def gw_port_hsrp_ip_check(self, gw_port, ip_addr):
+        ret_val = False
+
+        if (gw_port is not None):
+            ha_port = gw_port[ha.HA_INFO]['ha_port']
+
+            target_ip = ha_port['fixed_ips'][0]['ip_address']
+            LOG.info(_LI("target_ip: %(target_ip)s, actual_ip: %(ip_addr)s") %
+                     {'target_ip': target_ip,
+                      'ip_addr': ip_addr})
+            if ip_addr != target_ip:
+                LOG.info(_LI("HSRP VIP mismatch on gw_port, deleting"))
+                ret_val = False
+            else:
+                ret_val = True
+        else:
+            ret_val = False
+
+        return ret_val
+
     def subintf_hsrp_ip_check(self, intf_list, is_external, ip_addr):
         for target_intf in intf_list:
             ha_intf = target_intf[ha.HA_INFO]['ha_port']
@@ -985,7 +1040,7 @@ class ConfigSyncer(object):
 
         return True
 
-    def clean_interfaces_ipv4_hsrp_check(self, intf, intf_segment_dict):
+    def clean_interfaces_ipv4_hsrp_check(self, intf, intf_db_dict):
         # Check HSRP VIP
         hsrp_vip_cfg_list = intf.re_search_children(HSRP_V4_VIP_REGEX)
         if len(hsrp_vip_cfg_list) < 1:
@@ -995,11 +1050,19 @@ class ConfigSyncer(object):
         hsrp_vip_cfg = hsrp_vip_cfg_list[0]
         match_obj = re.match(HSRP_V4_VIP_REGEX, hsrp_vip_cfg.text)
         hsrp_vip_grp_num, hsrp_vip = match_obj.group(1, 2)
-        return self.subintf_hsrp_ip_check(intf_segment_dict[intf.segment_id],
-                                          intf.is_external,
-                                          hsrp_vip)
 
-    def clean_interfaces_ipv4_check(self, intf, intf_segment_dict):
+        if (intf.is_external):
+            return self.gw_port_hsrp_ip_check(
+                                            intf_db_dict[intf.segment_id],
+                                            hsrp_vip)
+        else:
+            return self.subintf_hsrp_ip_check(
+                                            intf_db_dict[intf.segment_id],
+                                            intf.is_external,
+                                            hsrp_vip)
+
+    def clean_interfaces_ipv4_check(self, intf, intf_db_dict):
+
         # Check that real IP address is correct
         ipv4_addr = intf.re_search_children(INTF_V4_ADDR_REGEX)
         if len(ipv4_addr) < 1:
@@ -1010,9 +1073,15 @@ class ConfigSyncer(object):
         match_obj = re.match(INTF_V4_ADDR_REGEX, ipv4_addr_cfg.text)
         ip_addr, netmask = match_obj.group(1, 2)
 
-        return self.subintf_real_ip_check(intf_segment_dict[intf.segment_id],
-                                          intf.is_external,
-                                          ip_addr, netmask)
+        if (intf.is_external):
+            return self.subintf_real_ip_check_gw_port(
+                                            intf_db_dict[intf.segment_id],
+                                            ip_addr, netmask)
+        else:
+            return self.subintf_real_ip_check(
+                                            intf_db_dict[intf.segment_id],
+                                            intf.is_external,
+                                            ip_addr, netmask)
 
     def clean_interfaces_ipv6_check(self, intf, intf_segment_dict):
         # Check that real IP address is correct
@@ -1043,7 +1112,7 @@ class ConfigSyncer(object):
 
         pending_delete_list = []
 
-        # TODO(split this big function into smaller functions)
+        # TODO(split this big function into smaller functions and refactor)
         for intf in runcfg_intfs:
             LOG.info(_LI("\nOpenstack interface: %s"), (intf))
 
@@ -1090,10 +1159,16 @@ class ConfigSyncer(object):
             # TODO(that specified in .ini file)
 
             # Check that the interface segment_id exists in the current DB data
-            if intf.segment_id not in intf_segment_dict:
+            if (intf.segment_id not in intf_segment_dict and
+               intf.segment_id not in self.segment_gw_dict):
                 LOG.info(_LI("Invalid segment ID, delete interface"))
                 pending_delete_list.append(intf)
                 continue
+
+            if (intf.segment_id in self.segment_gw_dict):
+                intf.is_external = True
+            else:
+                intf.is_external = False
 
             # Check if dot1q config is correct
             dot1q_cfg = intf.re_search_children(DOT1Q_REGEX)
@@ -1111,8 +1186,12 @@ class ConfigSyncer(object):
                     continue
 
             # Is this an "external network" segment_id?
-            db_intf = intf_segment_dict[intf.segment_id][0]
-            intf.is_external = db_intf['is_external']
+            if intf.is_external:
+                db_intf = self.segment_gw_dict[intf.segment_id]
+            else:
+                db_intf = intf_segment_dict[intf.segment_id][0]
+
+            # intf.is_external = db_intf['is_external']
             intf.has_ipv6 = is_port_v6(db_intf)
 
             # Check VRF config
@@ -1175,6 +1254,11 @@ class ConfigSyncer(object):
 
             correct_grp_num = int(db_intf[ha.HA_INFO]['group'])
 
+            if intf.is_external:
+                intf_db = self.segment_gw_dict
+            else:
+                intf_db = intf_segment_dict
+
             if intf.has_ipv6 is False:
                 if self.clean_interfaces_nat_check(intf,
                                                    segment_nat_dict) \
@@ -1182,17 +1266,17 @@ class ConfigSyncer(object):
                     pending_delete_list.append(intf)
                     continue
                 if self.clean_interfaces_ipv4_check(intf,
-                                                    intf_segment_dict) \
+                                                    intf_db) \
                     is False:
                     pending_delete_list.append(intf)
                     continue
                 if self.clean_interfaces_ipv4_hsrp_check(intf,
-                                                         intf_segment_dict) \
+                                                         intf_db) \
                     is False:
                     pending_delete_list.append(intf)
                     continue
             else:
-                if self.clean_interfaces_ipv6_check(intf, intf_segment_dict) \
+                if self.clean_interfaces_ipv6_check(intf, intf_db) \
                     is False:
                     pending_delete_list.append(intf)
                     continue
