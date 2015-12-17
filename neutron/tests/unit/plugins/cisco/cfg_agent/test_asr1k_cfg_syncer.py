@@ -209,15 +209,49 @@ class ASR1kCfgSyncer(base.BaseTestCase):
         conn = self.driver._get_connection()
 
         asr_running_cfg = self._read_asr_running_cfg()
-        parsed_cfg = ciscoconfparse.CiscoConfParse(asr_running_cfg)
 
-        # <IOSCfgLine # 200 'interface Port-channel10.2535'>
-        # , interface Port-channel10.2577
-        # is failing line 1165 (vrf_id and device_id not matching)
+        # This will trigger gateway only testing
+        # asr_running_cfg = \
+        #    self._read_asr_running_cfg('asr_basic_running_cfg.json')
+        parsed_cfg = ciscoconfparse.CiscoConfParse(asr_running_cfg)
 
         invalid_cfg += self.config_syncer.clean_interfaces(conn,
                                               intf_segment_dict,
                                               segment_nat_dict,
                                               parsed_cfg)
         # disabled for now
-        # self.assertEqual(0, len(invalid_cfg))
+        self.assertEqual(0, len(invalid_cfg))
+
+    def test_clean_interfaces_R2_with_invalid_intfs(self):
+        """
+        In this test, we are simulating a cfg-sync, clean_interfaces for
+        region 0000002 cfg-agent.  Existing running-cfg exists for region
+        0000001 and 0000002.
+
+        At the end of test, we should expect two invalid intfs
+        detected.
+
+        invalid tenant router, int Po10.2536 (invalid segment-id)
+        invalid ext-gw-port, int Po10.3000 (invalid HSRP VIP)
+        """
+        cfg.CONF.set_override('enable_multi_region', True, 'multi_region')
+        cfg.CONF.set_override('region_id', '0000002', 'multi_region')
+        cfg.CONF.set_override('other_region_ids', ['0000001'], 'multi_region')
+
+        intf_segment_dict = self.config_syncer.intf_segment_dict
+        segment_nat_dict = self.config_syncer.segment_nat_dict
+
+        invalid_cfg = []
+        conn = self.driver._get_connection()
+
+        asr_running_cfg = \
+            self._read_asr_running_cfg(
+                                    'asr_running_cfg_with_invalid_intfs.json')
+        parsed_cfg = ciscoconfparse.CiscoConfParse(asr_running_cfg)
+
+        invalid_cfg += self.config_syncer.clean_interfaces(conn,
+                                              intf_segment_dict,
+                                              segment_nat_dict,
+                                              parsed_cfg)
+        # disabled for now
+        self.assertEqual(2, len(invalid_cfg))
