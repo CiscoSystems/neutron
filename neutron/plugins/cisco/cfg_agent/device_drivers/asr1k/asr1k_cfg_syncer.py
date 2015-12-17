@@ -257,7 +257,7 @@ class ConfigSyncer(object):
             conn = self.driver._get_connection()
 
         LOG.info(_LI("*************************"))
-
+        LOG.info(_LI("neutron router db records"))
         for router_id, router in router_id_dict.iteritems():
             #LOG.info("ROUTER ID: %s   DATA: %s\n\n" % (router_id, router))
             LOG.info(_LI("ROUTER_ID: %s"), router_id)
@@ -1111,10 +1111,9 @@ class ConfigSyncer(object):
                         if obj.re_search_children(intf_desc_regex)]
 
         pending_delete_list = []
-
         # TODO(split this big function into smaller functions and refactor)
         for intf in runcfg_intfs:
-            LOG.info(_LI("\nOpenstack interface: %s"), (intf))
+            LOG.info(_LI("\nASR interface: %s"), (intf))
 
             # check for region-id
             if (is_multi_region_enabled):
