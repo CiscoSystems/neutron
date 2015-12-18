@@ -320,7 +320,7 @@ class TestHostingDevice(base.BaseTestCase):
 
     def test_check_backlog_above_BT_reachable_hosting_device(self):
         """
-        Test reviving a hosting device after it's been deemed 
+        Test reviving a hosting device after it's been deemed
         unresponsive and then becomes pingable before it's deemed
         dead.
         """
