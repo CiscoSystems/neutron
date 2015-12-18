@@ -66,8 +66,6 @@ class ASR1kCfgSyncer2(base.BaseTestCase):
             asr1k_cfg_syncer.ConfigSyncer2(self.router_db_info,
                                            self.driver,
                                            self.hosting_device_info)
-        import pdb
-        pdb.set_trace()
 
 
 class ASR1kCfgSyncer(base.BaseTestCase):
