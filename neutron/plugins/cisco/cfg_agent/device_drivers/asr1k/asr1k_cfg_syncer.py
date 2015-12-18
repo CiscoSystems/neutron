@@ -166,6 +166,167 @@ def is_port_v6(port):
         return False
 
 
+class ConfigSyncer2(object):
+    """
+    A refactored / reworked version
+    """
+
+    def __init__(self,
+                 router_db_info,
+                 driver,
+                 hosting_device_info):
+        """
+        @param router_db_info - the list of router dictionaries as supplied by
+                                the plugin
+        @param driver - the driver object associated with the underlying
+                        hosting device
+        @param hosting_device_info - the associated hosting-device
+        """
+
+        # the driver associated with the hosting
+        # device info.  The driver is used for
+        # applying any deletes to the underlying
+        # ASR
+        self.hosting_device_info = hosting_device_info
+        self.driver = driver
+
+        # A counter for the number of times the
+        # ConfigSyncer was invoked
+        self.num_delete_invalid_cfgs_invoked = 0
+
+        # searchable lookup dictionaries
+        # created from neutron-db, router_db_info.
+        #
+        # key, router_id, value = router dict
+        self.router_id_dict = {}
+
+        # key, segment_id, value = tenant interface
+        self.segment_intf_dict = {}
+
+        # key, segment_id, value = gw_port
+        self.segment_gw_dict = {}
+
+        # key, segment_id, value = Boolean
+        self.segment_nat_dict = {}
+
+        # populate search dictionaries
+        self._process_plugin_routers_data(router_db_info)
+
+    def __repr__(self):
+        current_state = \
+            {'hosting_device_info': self.hosting_device_info,
+             'driver': self.driver.__class__.__name__,
+             'num_delete_invalid_cfgs': self.num_delete_invalid_cfgs_invoked,
+             'router_id_dict_keys': self.router_id_dict.keys(),
+             'router_id_dict': self.router_id_dict,
+             'segment_intf_dict_keys': self.segment_intf_dict.keys(),
+             'segment_intf_dict': self.segment_intf_dict,
+             'segment_nat_dict': self.segment_nat_dict}
+
+        return "%s\n%s" % (self.__class__.__name__, pp.pformat(current_state))
+
+    def _is_router_valid_for_processing(self, router, hosting_device_id=None):
+        """
+        @param router - a router dictionary
+        """
+
+        # precondition check
+        if router is None:
+            return False
+
+        if 'hosting_device' not in router:
+            return False
+
+        if 'id' not in router['hosting_device']:
+            return False
+
+        # hosting-device check
+        if (hosting_device_id is not None and
+            router['hosting_device']['id'] != hosting_device_id):
+            return False
+
+        return True
+
+    def _process_router(self, router):
+        if (router is not None and
+            'id' in router):
+
+            short_router_id = router['id'][0:6]
+            self.router_id_dict[short_router_id] = router
+
+    def _process_router_db_interfaces(self, router):
+        """
+        Setup (tenant network) router interfaces lookup dictionary that's keyed
+        by segment-id
+        """
+
+        if ('_interfaces' in router):
+
+            router_intfs = router['_interfaces']
+
+            for router_intf in router_intfs:
+                hosting_info = router_intf['hosting_info']
+                segment_id = hosting_info['segmentation_id']
+
+                if segment_id not in self.segment_intf_dict:
+                    self.segment_intf_dict[segment_id] = []
+
+                self.segment_intf_dict[segment_id].append(router_intf)
+
+                if segment_id not in self.segment_nat_dict:
+                    self.segment_nat_dict[segment_id] = False
+
+    def _process_router_gw_port(self, router):
+
+        if (router is not None and 'gw_port' in router):
+
+            gw_port = router['gw_port']
+
+            if ('hosting_info' in gw_port and
+                'segmentation_id' in gw_port['hosting_info']):
+
+                gw_segment_id = gw_port['hosting_info']['segmentation_id']
+
+                if (router[ROUTER_ROLE_ATTR] ==
+                    cisco_constants.ROUTER_ROLE_GLOBAL):
+
+                    # note down actual gateway_port
+                    self.segment_gw_dict[gw_segment_id] = gw_port
+
+                    # if gw_port is present and (private) router interfaces
+                    # are also present, then dyn nat is enabled
+                    if '_interfaces' in router:
+                        for intf in router['_interfaces']:
+
+                            if ((intf['device_owner'] ==
+                                constants.DEVICE_OWNER_ROUTER_INTF) and
+                                (is_port_v6(intf) is False)):
+                                self.segment_nat_dict[gw_segment_id] = True
+
+                                intf_seg_id = \
+                                    intf['hosting_info']['segmentation_id']
+                                self.segment_nat_dict[intf_seg_id] = True
+
+    def _process_plugin_routers_data(self, router_db_info):
+        """
+        This method consumes the plugin supplied router_db_info and
+        initializes the internal search dictionaries.
+
+        For router in the router_db_info, screen out routers that don't
+        pertain to this Config-Syncers hosting-device.
+
+        @param router_db_info - A list of router dictionaries (from neutron-db)
+        """
+
+        my_hd_id = self.hosting_device_info['id']
+
+        for router in router_db_info:
+            if (self._is_router_valid_for_processing(router, my_hd_id)):
+                self._process_router(router)
+                self._process_router_db_interfaces(router)
+                self._process_router_gw_port(router)
+
+
 class ConfigSyncer(object):
 
     def __init__(self, router_db_info, driver,

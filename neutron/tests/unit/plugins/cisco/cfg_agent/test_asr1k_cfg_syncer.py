@@ -28,6 +28,47 @@ from neutron.plugins.cisco.cfg_agent.device_drivers.asr1k import (
 
 cfg.CONF.register_opts(driver.ASR1K_DRIVER_OPTS, "multi_region")
 
+class ASR1kCfgSyncer2(base.BaseTestCase):
+
+    def _read_neutron_db_data(self):
+        """
+        helper function for reading the dummy neutron router db
+        """
+        with open(base.ROOTDIR +
+                  '/unit/plugins/cisco/etc/cfg_syncer/neutron_router_db.json',
+                  'r') as fp:
+            self.router_db_info = jsonutils.load(fp)
+
+    def _read_asr_running_cfg(self, file_name='asr_running_cfg.json'):
+        """
+        helper function for reading sample asr running cfg files (json format)
+        """
+        asr_running_cfg = (
+            '/unit/plugins/cisco/etc/cfg_syncer/%s' % (file_name))
+
+        with open(base.ROOTDIR + asr_running_cfg, 'r') as fp:
+            asr_running_cfg_json = jsonutils.load(fp)
+            return asr_running_cfg_json
+
+    def setUp(self):
+        super(ASR1kCfgSyncer2, self).setUp()
+
+        self._read_neutron_db_data()
+        self.hosting_device_info = \
+            {'id': '00000000-0000-0000-0000-000000000003'}
+        self.driver = mock.Mock()
+
+    def tearDown(self):
+        super(ASR1kCfgSyncer2, self).tearDown()
+
+    def test_process_plugin_routers_data(self):
+        self.config_syncer = \
+            asr1k_cfg_syncer.ConfigSyncer2(self.router_db_info,
+                                           self.driver,
+                                           self.hosting_device_info)
+        import pdb
+        pdb.set_trace()
+
 
 class ASR1kCfgSyncer(base.BaseTestCase):
 
