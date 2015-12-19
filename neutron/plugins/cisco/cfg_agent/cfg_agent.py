@@ -476,6 +476,8 @@ class CiscoCfgAgentWithStateReport(CiscoCfgAgent):
             LOG.exception(_LE("Failed sending agent report!"))
 
 
+from neutron.plugins.cisco.common import utils
+
 def main(manager='neutron.plugins.cisco.cfg_agent.'
                  'cfg_agent.CiscoCfgAgentWithStateReport'):
     conf = cfg.CONF
@@ -486,6 +488,7 @@ def main(manager='neutron.plugins.cisco.cfg_agent.'
     common_config.init(sys.argv[1:])
     conf(project='neutron')
     config.setup_logging()
+    utils.mock_ncclient()
     server = neutron_service.Service.create(
         binary='neutron-cisco-cfg-agent',
         topic=c_constants.CFG_AGENT,
