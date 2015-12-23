@@ -83,8 +83,7 @@ class CfgAgentDebug(base.BaseTestCase):
                                                 'REMOVE_GW_PORT',
                                                 request_id)
         self.assertEqual(2, len(self.cfg_agent_debug.routers))
-        self.assertEqual(4,
-                         self.cfg_agent_debug._get_total_txn_count())
+        self.assertEqual(4, self.cfg_agent_debug._get_total_txn_count())
 
         # print(self.cfg_agent_debug.get_all_router_txns_strfmt())
         print("Just nrouter-abc100-0000001 txns")
