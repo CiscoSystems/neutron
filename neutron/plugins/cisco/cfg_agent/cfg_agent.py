@@ -38,6 +38,7 @@ from neutron import manager
 from neutron.openstack.common import loopingcall
 from neutron.openstack.common import periodic_task
 from neutron.openstack.common import service
+from neutron.plugins.cisco.cfg_agent import cfg_agent_debug
 from neutron.plugins.cisco.cfg_agent import device_status
 from neutron.plugins.cisco.common import cisco_constants as c_constants
 from neutron import service as neutron_service
@@ -152,6 +153,7 @@ class CiscoCfgAgent(manager.Manager):
         self._dev_status.enable_heartbeat = (
             self.conf.cfg_agent.enable_heartbeat)
         self.context = n_context.get_admin_context_without_session()
+        self.cfg_agent_debug = cfg_agent_debug.CfgAgentDebug()
 
         self._initialize_rpc(host)
         self._initialize_service_helpers(host)
