@@ -786,6 +786,9 @@ class RoutingServiceHelper(object):
                       {'id': router_id, 'role': router[ROUTER_ROLE_ATTR]})
         else:
             driver.router_added(ri)
+            self.cfg_agent.cfg_agent_debug.add_router_txn(ri.id,
+                                       "RTR_CREATED",
+                                       self.context.request_id)
         self.router_info[router_id] = ri
 
     def _router_removed(self, router_id, deconfigure=True):
@@ -818,6 +821,9 @@ class RoutingServiceHelper(object):
                 driver = self.driver_manager.get_driver(router_id)
                 driver.router_removed(ri)
                 self.driver_manager.remove_driver(router_id)
+                self.cfg_agent.cfg_agent_debug.add_router_txn(ri.id,
+                                           "RTR_RM",
+                                           self.context.request_id)
             del self.router_info[router_id]
             self.removed_routers.discard(router_id)
         except cfg_exceptions.DriverException:
@@ -833,30 +839,70 @@ class RoutingServiceHelper(object):
     def _internal_network_added(self, ri, port, ex_gw_port):
         driver = self.driver_manager.get_driver(ri.id)
         driver.internal_network_added(ri, port)
+        self.cfg_agent.cfg_agent_debug.add_router_txn(ri.id,
+                                       "RTR_INT_INTF_ADD",
+                                       self.context.request_id,
+                                       comment="net-id: %s" % (
+                                            pp.pformat(port['network_id'])))
         if ri.snat_enabled and ex_gw_port:
             driver.enable_internal_network_NAT(ri, port, ex_gw_port)
+            self.cfg_agent.cfg_agent_debug.add_router_txn(ri.id,
+                                       "DYN_NAT_ADD",
+                                       self.context.request_id,
+                                       comment="net-id: %s" % (
+                                            pp.pformat(port['network_id'])))
 
     def _internal_network_removed(self, ri, port, ex_gw_port):
         driver = self.driver_manager.get_driver(ri.id)
         driver.internal_network_removed(ri, port)
+        self.cfg_agent.cfg_agent_debug.add_router_txn(ri.id,
+                                       "RTR_INT_INTF_RM",
+                                       self.context.request_id,
+                                       comment="net-id: %s" % (
+                                            pp.pformat(port['network_id'])))
         if ri.snat_enabled and ex_gw_port:
             #ToDo(Hareesh): Check if the intfc_deleted attribute is needed
             driver.disable_internal_network_NAT(ri, port, ex_gw_port,
                                                 itfc_deleted=True)
+            self.cfg_agent.cfg_agent_debug.add_router_txn(ri.id,
+                                       "DYN_NAT_RM",
+                                       self.context.request_id,
+                                       comment="net-id: %s" % (
+                                            pp.pformat(port['network_id'])))
 
     def _external_gateway_added(self, ri, ex_gw_port):
         driver = self.driver_manager.get_driver(ri.id)
         driver.external_gateway_added(ri, ex_gw_port)
+        self.cfg_agent.cfg_agent_debug.add_router_txn(ri.id,
+                                 "GW_PORT_ADD",
+                                 self.context.request_id,
+                                 comment="ext-net-id: %s" % (
+                                        pp.pformat(ex_gw_port['network_id'])))
         if ri.snat_enabled and ri.internal_ports:
             for port in ri.internal_ports:
                 driver.enable_internal_network_NAT(ri, port, ex_gw_port)
+                self.cfg_agent.cfg_agent_debug.add_router_txn(ri.id,
+                                       "DYN_NAT_ADD",
+                                       self.context.request_id,
+                                       comment="net-id: %s" % (
+                                            pp.pformat(port['network_id'])))
 
     def _external_gateway_removed(self, ri, ex_gw_port):
         driver = self.driver_manager.get_driver(ri.id)
         if ri.snat_enabled and ri.internal_ports:
             for port in ri.internal_ports:
                 driver.disable_internal_network_NAT(ri, port, ex_gw_port)
+                self.cfg_agent.cfg_agent_debug.add_router_txn(ri.id,
+                                       "DYN_NAT_RM",
+                                       self.context.request_id,
+                                       comment="net-id: %s" % (
+                                            pp.pformat(port['network_id'])))
         driver.external_gateway_removed(ri, ex_gw_port)
+        self.cfg_agent.cfg_agent_debug.add_router_txn(ri.id,
+                                 "GW_PORT_RM",
+                                 self.context.request_id,
+                                 comment="ext-net-id: %s" % (
+                                        pp.pformat(ex_gw_port['network_id'])))
 
     def _floating_ip_added(self, ri, ex_gw_port, floating_ip, fixed_ip):
         driver = self.driver_manager.get_driver(ri.id)

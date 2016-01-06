@@ -104,7 +104,8 @@ class CfgAgentDebug(object):
         self.requests[request_id] = {'time': datetime.datetime.strftime(
                        datetime.datetime.now(), format='%Y-%m-%d %H:%M:%S.%f')}
 
-    def add_router_txn(self, router_id, txn_type, request_id=None):
+    def add_router_txn(self, router_id, txn_type, request_id=None,
+                       comment=None):
         if not cfg.CONF.cfg_agent.enable_cfg_agent_debug:
             return
 
@@ -122,7 +123,8 @@ class CfgAgentDebug(object):
         txn_record = {'time': datetime.datetime.strftime(
                        datetime.datetime.now(), format='%Y-%m-%d %H:%M:%S.%f'),
                       'request_id': request_id,
-                      'txn_type': txn_type}
+                      'txn_type': txn_type,
+                      'comment': comment}
 
         CfgAgentDebug._add_child_record(self.routers, router_id, txn_record)
 
@@ -133,13 +135,15 @@ class CfgAgentDebug(object):
         router_txn_buffer = None
 
         if router_id in self.routers:
-            table = prettytable.PrettyTable(["time", "request_id", "txn_type"])
+            table = prettytable.PrettyTable(["time", "request_id",
+                                             "txn_type", "comment"])
             router_txns = self.routers[router_id]
 
             for txn in router_txns:
                 table.add_row([txn['time'],
                                txn['request_id'],
-                               txn['txn_type']])
+                               txn['txn_type'],
+                               txn['comment']])
 
             router_txn_buffer = "router_id:%s\n%s" % (
                                                 router_id, table.get_string())
