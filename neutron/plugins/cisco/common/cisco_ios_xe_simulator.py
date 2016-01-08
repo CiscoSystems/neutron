@@ -1,3 +1,27 @@
+# Copyright 2015 Cisco Systems, Inc.  All rights reserved.
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+
+# A tiny and simple Cisco IOS XE running config simulator.
+# The intended use is to allow a developer to observe how the running config
+# of an IOS XE device evolves as CLI commands are issued.
+#
+# Simple implies here that no CLI syntax or semantical checks are made so it
+# is entirely up to the command issuer to ensure the correctness of the
+# commands and their arguments.
+#
+# Bob Melander (bob.melander@gmail.com)
+
 import re
 
 from oslo_utils import timeutils
@@ -8,11 +32,11 @@ class CiscoIOSXESimulator(object):
     # set of commands to be logged only
     log_only_commands = set()
     # set of commands bound to immediately preceding line
-    parent_bound_commands = {'address-family'}
+    parent_bound_commands = {'exit-address-family'}
+    exclamation = {'vrf definition', 'exit-address-family'}
 
     def __init__(self, path, host_ip, netmask, port, username, password,
                  device_params, mgmt_interface, timeout):
-#        self.rcf = path + 'running_config_' + host_ip.replace('.', '_')
         self.host_ip = host_ip
         self.netmask = netmask
         self.port = port
@@ -33,14 +57,15 @@ class CiscoIOSXESimulator(object):
         rc_data = {'rc_str': intro_lines}
         for cmd, args in sorted(self.rc.iteritems()):
             line = cmd
-            self._build_line(rc_data, args, line, True)
+            self._build_line(rc_data, args, line, 0)
+        print(rc_data['rc_str'])
         return rc_data['rc_str']
 
     def edit_config(self, snippet):
         command_lines = self._get_command_lines(snippet)
         if not command_lines:
             return
-        self._process_next_level(self.rc, self.rc, command_lines, True)
+        self._process_next_level(self.rc, self.rc, command_lines, None, True)
         return True
 
     def _set_default_config(self):
@@ -56,53 +81,66 @@ class CiscoIOSXESimulator(object):
              "negotiation auto"]
         ]
         for commands in command_chunks:
-            self._process_next_level(self.rc, self.rc, commands, True)
+            self._process_next_level(self.rc, self.rc, commands, None, True)
 
-    def _build_line(self, rc_data, current_dict, baseline, is_root=False):
-        for current, the_rest in sorted(current_dict.iteritems()):
-            if current == 'EOL':
+    def _build_line(self, rc_data, current, baseline, level):
+        for string, the_rest in sorted(current.iteritems()):
+            if string == 'EOL':
                 continue
             line = baseline
-            line += ' ' + current if line != "" else current
+            line += ' ' + string if line != "" else string
             if 'EOL' in the_rest:
-                rc_data['rc_str'] += line + "\n"
+                termination = "\n!\n" if self._to_exclamate(line) else "\n"
+                rc_data['rc_str'] += line + termination
                 line = ""
-            self._build_line(rc_data, the_rest, line)
-            if is_root is True:
+            self._build_line(rc_data, the_rest, line, level + 1)
+            if level == 0:
                 rc_data['rc_str'] += "!\n"
 
-    def _process_next_level(self, parent, current_dict, remaining_lines,
-                            is_root=False):
+    def _to_exclamate(self, line):
+        for statement in self.exclamation:
+            if line.startswith(statement):
+                return True
+        return False
+
+    def _process_next_level(self, parent, current, remaining_lines,
+                            last_processed, is_root=False):
         if not remaining_lines:
             return
         pre, cmd_line = self._get_command_prepending(remaining_lines[0])
         if pre is None:
-            self._process_set(cmd_line, parent, current_dict,
-                              remaining_lines, is_root)
+            self._process_set(cmd_line, parent, current,
+                              remaining_lines, last_processed, is_root)
         elif pre.lower() == "no":
-            self._process_unset(cmd_line.split(" "), current_dict)
+            self._process_unset(cmd_line.split(" "), current)
 
-    def _process_set(self, cmd_line, parent, current_dict, remaining_lines,
-                     is_root):
+    def _process_set(self, cmd_line, parent, current, remaining_lines,
+                     last_processed, is_root):
         cmd, args = self._get_command_and_args(cmd_line)
         if cmd in self.log_only_commands:
-            self._process_next_level(parent, current_dict, remaining_lines[1:])
+            self._process_next_level(parent, current,
+                                     remaining_lines[1:], last_processed)
             return
-        level_dict = parent.get(cmd)
-        if level_dict is None:
-            level_dict, current_parent = self._get_successor_and_its_parent(
-                parent, cmd, current_dict, is_root)
+        if cmd in self.parent_bound_commands:
+            this_one = last_processed.get(cmd)
+            start = last_processed
         else:
-            current_parent = current_dict
+            this_one = parent.get(cmd)
+            start = current
+        if this_one is None:
+            this_one, current_parent = self._get_successor_and_its_parent(
+                parent, cmd, start, is_root)
+        else:
+            current_parent = start
         for arg in args:
-            next_dict, current_parent = self._get_successor_and_its_parent(
-                current_parent, arg, level_dict, is_root)
-            level_dict = next_dict
-        level_dict['EOL'] = True
+            next_one, current_parent = self._get_successor_and_its_parent(
+                current_parent, arg, this_one, is_root)
+            this_one = next_one
+        this_one['EOL'] = True
         if is_root is True:
-            current_dict = level_dict
-        self._process_next_level(current_parent, current_dict,
-                                 remaining_lines[1:])
+            current = this_one
+        self._process_next_level(current_parent, current, remaining_lines[1:],
+                                 this_one)
 
     def _process_unset(self, remaining, current):
         if not remaining:
@@ -115,7 +153,7 @@ class CiscoIOSXESimulator(object):
             else:
                 self._process_unset(rest, current[arg])
                 num_items = len(current[arg])
-                if num_items == 0:                                   
+                if num_items == 0:
                     del current[arg]
 
     def _get_successor_and_its_parent(self, parent, string, current, is_root):

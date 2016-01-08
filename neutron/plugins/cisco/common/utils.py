@@ -88,9 +88,9 @@ def convert_validate_driver_class(driver_class_name):
 # agent with fake ncclient. That mocked mode of running the config agent is
 # useful for end-2-end-like debugging without actual backend hosting devices.
 def mock_ncclient():
+    import cisco_ios_xe_simulator as cisco_ios_xe
     import mock
     import os
-    import cisco_ios_xe_simulator as cisco_ios_xe
 
     def _fake_connect(host, port, username, password, device_params, timeout):
         sim = cisco_ios_xe.CiscoIOSXESimulator(
@@ -108,7 +108,7 @@ def mock_ncclient():
                         default_operation=None, test_option=None,
                         error_option=None):
             rc_emul.edit_config(config)
-            print rc_emul.get_config()
+            print(rc_emul.get_config())
             return ok_xml_obj
 
         ok_xml_obj = mock.MagicMock()
@@ -119,10 +119,10 @@ def mock_ncclient():
     def _get_fake_get_config(simulator):
 
         def get_running_config(source):
-            head=('<?xml version="1.0" encoding="UTF-8"?><rpc-reply '
-                  'message-id="urn:uuid:ec8bab72-a500-11e5-a92f-74a2e6d55908" '
-                  'xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><data>'
-                  '<cli-config-data-block>!')
+            head = ('<?xml version="1.0" encoding="UTF-8"?><rpc-reply '
+                    'message-id="urn:uuid:ec8bab72-a500-11e5-a92f'
+                    '-74a2e6d55908" xmlns="urn:ietf:params:xml:ns:netconf:'
+                    'base:1.0"><data><cli-config-data-block>!')
             tail = '</cli-config-data-block></data></rpc-reply>'
             raw_rc = rc_emul.get_config()
             return cisco_ios_xe.FakeRunningConfig(head + raw_rc + tail)

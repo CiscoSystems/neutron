@@ -478,6 +478,7 @@ class CiscoCfgAgentWithStateReport(CiscoCfgAgent):
 
 from neutron.plugins.cisco.common import utils
 
+
 def main(manager='neutron.plugins.cisco.cfg_agent.'
                  'cfg_agent.CiscoCfgAgentWithStateReport'):
     conf = cfg.CONF
