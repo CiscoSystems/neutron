@@ -209,6 +209,11 @@ class RoutingServiceHelper(object):
         LOG.debug('Got routers removed from hosting device: %s', router_ids)
         self.router_deleted(context, router_ids)
 
+    # cfg_agent debug RPC endpoints
+    def debug_get_router_txns(self, context, router_ids):
+        LOG.debug('Got debug_get_router_txns for %s' % pp.pformat(router_ids))
+        return self.cfg_agent.cfg_agent_debug.get_all_router_txns_strfmt()
+
     # Routing service helper public methods
 
     @property
