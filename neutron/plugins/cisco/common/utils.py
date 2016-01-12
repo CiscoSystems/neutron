@@ -85,7 +85,7 @@ def convert_validate_driver_class(driver_class_name):
 
 
 # NOTE(bobmel): call _mock_ncclient() in main() of cfg_agent.py to run config
-# agent with fake ncclient. That mocked mode of running the config agent is
+# agent with a fake ncclient. That mocked mode of running the config agent is
 # useful for end-2-end-like debugging without actual backend hosting devices.
 def mock_ncclient():
     import cisco_ios_xe_simulator as cisco_ios_xe
@@ -131,7 +131,7 @@ def mock_ncclient():
         return get_running_config
 
     def _fake_is_pingable(ip):
-        # if a file with a certain name (derived for the 'ip' argument):
+        # if a file with a certain name (derived from the 'ip' argument):
         #
         #     /opt/stack/data/neutron/DEAD__10_0_5_8       (ip = 10.0.5.8)
         #
