@@ -166,6 +166,44 @@ def is_port_v6(port):
         return False
 
 
+def clean_snat(cfg_sync_ctx):
+    LOG.info(_LI("clean_snat invoked"))
+
+
+def clean_nat_pool_overload(cfg_sync_ctx):
+    LOG.info(_LI("clean_nat_pool_overload invoked"))
+
+
+def clean_nat_pool(cfg_sync_ctx):
+    LOG.info(_LI("clean_nat_pool invoked"))
+
+
+def clean_default_route(cfg_sync_ctx):
+    LOG.info(_LI("clean_default_route invoked"))
+
+
+def clean_acls(cfg_sync_ctx):
+    LOG.info(_LI("clean_acls invoked"))
+
+
+def clean_interfaces(cfg_sync_ctx):
+    LOG.info(_LI("clean_interfaces invoked"))
+
+
+def clean_vrfs(cfg_sync_ctx):
+    LOG.info(_LI("clean_vrfs invoked"))
+
+
+INVALID_CFG_CHECK = [
+    clean_snat,
+    clean_nat_pool_overload,
+    clean_default_route,
+    clean_acls,
+    clean_interfaces,
+    clean_vrfs
+]
+
+
 class ConfigSyncer2(object):
     """
     A refactored / reworked version
@@ -248,6 +286,12 @@ class ConfigSyncer2(object):
         return True
 
     def _process_router(self, router):
+        """
+        tenant routers are represented as vrfs in the ASR
+
+        nrouter-[6 digit uuid] or
+        nrouter-[6 digit uuid)-[7 digit region-id]
+        """
         if (router is not None and
             'id' in router):
 
@@ -277,7 +321,12 @@ class ConfigSyncer2(object):
                     self.segment_nat_dict[segment_id] = False
 
     def _process_router_gw_port(self, router):
+        """
+        This helper method populates the segment_gw_dict
 
+        Global routers model the physical interface used for
+        connecting to the provider external network.
+        """
         if (router is not None and 'gw_port' in router):
 
             gw_port = router['gw_port']
@@ -325,6 +374,51 @@ class ConfigSyncer2(object):
                 self._process_router(router)
                 self._process_router_db_interfaces(router)
                 self._process_router_gw_port(router)
+
+
+    def get_running_config(self, conn):
+        """Get the CSR's current running config.
+        :return: Current IOS running config as multiline string
+        """
+        config = conn.get_config(source="running")
+        if config:
+            root = ET.fromstring(config._raw)
+            running_config = root[0][0]
+            rgx = re.compile("\r*\n+")
+            ioscfg = rgx.split(running_config.text)
+            return ioscfg
+
+    def delete_invalid_cfg(self, conn=None):
+        """
+        Retrieves running-config from ASR and compares against neutron-db
+        search dictionaries
+        """
+
+        if not conn:
+            conn = self.driver._get_connection()
+
+        LOG.debug("*************************")
+        LOG.debug("neutron router db records")
+        LOG.debug("%s" % self)
+
+        running_cfg = self.get_running_config(conn)
+
+        parsed_cfg = ciscoconfparse.CiscoConfParse(running_cfg)
+
+        invalid_cfg = []
+
+        cfg_sync_ctx = {'running_cfg': running_cfg,
+                        'parsed_cfg': parsed_cfg,
+                        'invalid_cfg': invalid_cfg,
+                        'conn': conn,
+                        'cfg_syncer': self}
+
+        for check_func in INVALID_CFG_CHECK:
+            check_func(cfg_sync_ctx)
+
+    def clean_snat(self, conn, parsed_cfg):
+        pass
+
 
 
 class ConfigSyncer(object):

@@ -28,6 +28,7 @@ from neutron.plugins.cisco.cfg_agent.device_drivers.asr1k import (
 
 cfg.CONF.register_opts(driver.ASR1K_DRIVER_OPTS, "multi_region")
 
+
 class ASR1kCfgSyncer2(base.BaseTestCase):
 
     def _read_neutron_db_data(self):
@@ -66,6 +67,13 @@ class ASR1kCfgSyncer2(base.BaseTestCase):
             asr1k_cfg_syncer.ConfigSyncer2(self.router_db_info,
                                            self.driver,
                                            self.hosting_device_info)
+
+    def test_delete_invalid_cfg(self):
+        self.config_syncer = \
+            asr1k_cfg_syncer.ConfigSyncer2(self.router_db_info,
+                                           self.driver,
+                                           self.hosting_device_info)
+        self.config_syncer.delete_invalid_cfg()
 
 
 class ASR1kCfgSyncer(base.BaseTestCase):
