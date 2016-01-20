@@ -227,6 +227,8 @@ class RoutingServiceHelper(object):
                       pp.pformat(self.updated_routers))
             LOG.debug("**** Removed routers:%s",
                       pp.pformat(self.removed_routers))
+            LOG.debug("**** cfg_agent_debug:%s" % (
+                self.cfg_agent.cfg_agent_debug.get_all_router_txns_strfmt()))
 
             resources = {}
             routers = []
@@ -234,6 +236,11 @@ class RoutingServiceHelper(object):
             all_routers_flag = False
             if self.fullsync:
                 LOG.debug("FullSync flag is on. Starting fullsync")
+                self.cfg_agent.cfg_agent_debug.add_agent_txn("cfg_agent",
+                          "FULL_SYNC_START",
+                          None,
+                          "Full Sync")
+
                 # Setting all_routers_flag and clear the global full_sync flag
                 all_routers_flag = True
                 self.fullsync = False
@@ -245,6 +252,10 @@ class RoutingServiceHelper(object):
                 LOG.debug("All routers: %s" % (pp.pformat(routers)))
                 if routers is not None:
                     self._cleanup_invalid_cfg(routers)
+                self.cfg_agent.cfg_agent_debug.add_agent_txn("cfg_agent",
+                          "FULL_SYNC_END",
+                          None,
+                          "Full Sync")
             else:
                 if self.updated_routers:
                     router_ids = list(self.updated_routers)
@@ -259,6 +270,11 @@ class RoutingServiceHelper(object):
                     sync_devices_list = list(self.sync_devices)
                     LOG.debug("Fetching routers on devices :%s",
                               sync_devices_list)
+                    self.cfg_agent.cfg_agent_debug.add_agent_txn("cfg_agent",
+                                             "DEVICE_SYNC_START",
+                                             None,
+                                             "devices %s" % (pp.pformat(
+                                                          sync_devices_list)))
 
                     fetched_routers = self._fetch_router_info(
                         device_ids=sync_devices_list)
@@ -309,6 +325,11 @@ class RoutingServiceHelper(object):
                                    (self.sync_devices_attempts,
                                    cfg.CONF.cfg_agent.max_device_sync_attempts,
                                    pp.pformat(self.sync_devices)))
+
+                    self.cfg_agent.cfg_agent_debug.add_agent_txn("cfg_agent",
+                          "DEVICE_SYNC_END",
+                          None,
+                          "devices %s" % (pp.pformat(sync_devices_list)))
 
                 if removed_devices_info:
                     if removed_devices_info.get('deconfigure'):
