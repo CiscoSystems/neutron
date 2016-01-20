@@ -223,7 +223,7 @@ class RoutingServiceHelper(object):
             LOG.debug("**** Removed routers:%s",
                       pp.pformat(self.removed_routers))
             LOG.debug("**** cfg_agent_debug:%s" % (
-                self.cfg_agent.cfg_agent_debug.get_all_agents_txns_strfmt()))
+                self.cfg_agent.cfg_agent_debug.get_all_agent_txns_strfmt()))
             LOG.debug("**** cfg_agent_debug routers:%s" % (
                 self.cfg_agent.cfg_agent_debug.get_all_router_txns_strfmt()))
 
