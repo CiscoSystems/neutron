@@ -255,8 +255,6 @@ class DeviceStatus(object):
                     LOG.debug("hosting devices revived & reachable, %s" %
                               (pprint.pformat(hd)))
                     hd['hd_state'] = cc.HD_ACTIVE
-                    response_dict['revived'].append(hd_id)
-                    # Rely just on full-sync to ensure consistent
                     # hosting device state
                     response_dict['reachable'].append(hd_id)
                 elif hd_state == cc.HD_DEAD:
