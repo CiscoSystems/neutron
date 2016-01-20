@@ -224,7 +224,7 @@ class CfgAgentDebug(object):
 
         for agent_id in self.cfg_agent_txns:
             all_agent_txns += "\n%s\n" % (
-                self.get_table_txns(agent_id))
+                self.get_agent_txns_strfmt(agent_id))
 
         return all_agent_txns
 
