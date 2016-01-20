@@ -222,6 +222,8 @@ class RoutingServiceHelper(object):
                       pp.pformat(self.updated_routers))
             LOG.debug("**** Removed routers:%s",
                       pp.pformat(self.removed_routers))
+            LOG.debug("**** cfg_agent_debug:%s" % (
+                self.cfg_agent.cfg_agent_debug.get_all_router_txns_strfmt()))
 
             resources = {}
             routers = []
