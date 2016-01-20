@@ -59,8 +59,11 @@ class CfgAgentDebug(object):
         # }
         self.routers = OrderedDict()
 
+        # a chronological log of cfg-agent level txns
+        self.cfg_agent_txns = OrderedDict()
+
         # a lookup table of transactions/events pertaining to a hosting-device
-        self.hosting_devices = {}
+        self.hosting_devices = OrderedDict()
 
     def __repr__(self):
         ret_val = {'router_txns': self.routers,
@@ -128,6 +131,60 @@ class CfgAgentDebug(object):
 
         CfgAgentDebug._add_child_record(self.routers, router_id, txn_record)
 
+    def add_agent_txn(self, agent_id, txn_type, request_id=None, comment=None):
+        """
+        Logs a cfg-agent level txn
+        *e.g. syncs
+
+        Probably should just collapse all the different "tables"
+        into one OrderedDict
+        """
+        if not cfg.CONF.cfg_agent.enable_cfg_agent_debug:
+            return
+
+        if agent_id not in self.cfg_agent_txns:
+
+            popped_agent_key, popped_agent_txns = \
+                CfgAgentDebug._enforce_parent_record_constraints(
+                                                           self.cfg_agent_txns)
+            if (popped_agent_key is not None and
+                popped_agent_txns is not None):
+                LOG.debug("Popped key %s, val = %s" % (popped_agent_key,
+                                           pprint.pformat(popped_agent_txns)))
+
+            self.cfg_agent_txns[agent_id] = []
+
+        agent_txn_record = {'time': datetime.datetime.strftime(
+                      datetime.datetime.now(), format='%Y-%m-%d %H:%M:%S.%f'),
+                      'request_id': request_id,
+                      'txn_type': txn_type,
+                      'comment': comment}
+
+        CfgAgentDebug._add_child_record(self.cfg_agent_txns,
+                                        agent_id,
+                                        agent_txn_record)
+
+    def get_agent_txns_strfmt(self, agent_id):
+
+        agent_txns_buffer = None
+
+        if agent_id in self.cfg_agent_txns:
+            table = prettytable.PrettyTable(["time", "request_id",
+                                             "txn_type", "comment"])
+
+            agent_txns = self.cfg_agent_txns[agent_id]
+
+            for agent_txn in agent_txns:
+                table.add_row([agent_txn['time'],
+                               agent_txn['request_id'],
+                               agent_txn['txn_type'],
+                               agent_txn['comment']])
+
+            agent_txns_buffer = "agent_id:%s\n%s" % (
+                                                agent_id, table.get_string())
+
+        return agent_txns_buffer
+
     def get_router_txns_strfmt(self, router_id):
         """
         Returns router txn records for a specified router_id
@@ -161,6 +218,15 @@ class CfgAgentDebug(object):
                                         self.get_router_txns_strfmt(router_id))
 
         return all_router_txns
+
+    def get_all_agent_txns_strfmt(self):
+        all_agent_txns = ''
+
+        for agent_id in self.cfg_agent_txns:
+            all_agent_txns += "\n%s\n" % (
+                self.get_table_txns(agent_id))
+
+        return all_agent_txns
 
     def _get_total_txn_count(self):
 
