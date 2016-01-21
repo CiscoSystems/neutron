@@ -1014,7 +1014,10 @@ class ConfigSyncer(object):
 
         intf.nat_type = intf_nat_type
 
-        if segment_nat_dict[intf.segment_id] is True:
+        if ((intf.segment_id in segment_nat_dict or
+             intf.segment_id in self.segment_gw_dict) and
+            (segment_nat_dict[intf.segment_id] is True or
+             self.segment_gw_dict[intf.segment_id] is True)):
             if intf.is_external:
                 if intf_nat_type != "outside":
                     nat_cmd = XML_CMD_TAG % (intf.text)
