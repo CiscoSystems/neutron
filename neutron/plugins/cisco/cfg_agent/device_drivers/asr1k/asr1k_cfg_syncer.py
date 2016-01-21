@@ -194,7 +194,6 @@ class ConfigSyncer(object):
         router_id_dict = {}
         interface_segment_dict = {}
         segment_nat_dict = {}
-
         for router in routers:
             if 'hosting_device' not in router:
                 continue
@@ -1014,10 +1013,8 @@ class ConfigSyncer(object):
 
         intf.nat_type = intf_nat_type
 
-        if ((intf.segment_id in segment_nat_dict and
-             segment_nat_dict[intf.segment_id] is True) or
-            (intf.segment_id in self.segment_gw_dict and
-             self.segment_gw_dict[intf.segment_id] is True)):
+        if (intf.segment_id in segment_nat_dict and
+            segment_nat_dict[intf.segment_id] is True):
             if intf.is_external:
                 if intf_nat_type != "outside":
                     nat_cmd = XML_CMD_TAG % (intf.text)
