@@ -186,6 +186,10 @@ class RoutingServiceHelper(object):
         """Deal with router deletion RPC message."""
         LOG.debug('Got router deleted notification for %s', routers)
         self.removed_routers.update(routers)
+        self.cfg_agent.cfg_agent_debug.add_agent_txn("cfg_agent",
+                          "ROUTERS_DELETED",
+                          None,
+                          "routers:%s" % (pp.pformat(routers)))
 
     def routers_updated(self, context, routers):
         """Deal with routers modification and creation RPC message."""
@@ -195,19 +199,35 @@ class RoutingServiceHelper(object):
             if isinstance(routers[0], dict):
                 routers = [router['id'] for router in routers]
             self.updated_routers.update(routers)
+            self.cfg_agent.cfg_agent_debug.add_agent_txn("cfg_agent",
+                          "RTRS_UPDATED",
+                          None,
+                          "routers:%s" % (pp.pformat(routers)))
 
     def router_removed_from_hosting_device(self, context, routers):
         LOG.debug('Got router removed from hosting device: %s', routers)
         self.router_deleted(context, routers)
+        self.cfg_agent.cfg_agent_debug.add_agent_txn("cfg_agent",
+                          "RTR_RM_FROM_HST_DVC",
+                          None,
+                          "routers:%s" % (pp.pformat(routers)))
 
     def router_added_to_hosting_device(self, context, routers):
         LOG.debug('Got router added to hosting device :%s', routers)
         self.routers_updated(context, routers)
+        self.cfg_agent.cfg_agent_debug.add_agent_txn("cfg_agent",
+                          "RTR_ADD_HST_DVC",
+                          None,
+                          "routers:%s" % (pp.pformat(routers)))
 
     # version 1.1
     def routers_removed_from_hosting_device(self, context, router_ids):
         LOG.debug('Got routers removed from hosting device: %s', router_ids)
         self.router_deleted(context, router_ids)
+        self.cfg_agent.cfg_agent_debug.add_agent_txn("cfg_agent",
+                          "RTRS_RM_FROM_HST_DVC",
+                          None,
+                          "routers:%s" % (pp.pformat(router_ids)))
 
     # Routing service helper public methods
 
@@ -226,6 +246,8 @@ class RoutingServiceHelper(object):
                 self.cfg_agent.cfg_agent_debug.get_all_agent_txns_strfmt()))
             LOG.debug("**** cfg_agent_debug routers:%s" % (
                 self.cfg_agent.cfg_agent_debug.get_all_router_txns_strfmt()))
+            LOG.debug("**** cfg_agent_debug fips:%s" % (
+                self.cfg_agent.cfg_agent_debug.get_all_fip_txns_strfmt()))
 
             resources = {}
             routers = []
@@ -312,6 +334,13 @@ class RoutingServiceHelper(object):
                                  "be attempted." %
                                  (self.sync_devices_attempts,
                                  cfg.CONF.cfg_agent.max_device_sync_attempts))
+
+                            self.cfg_agent.cfg_agent_debug.add_agent_txn(
+                                             "cfg_agent",
+                                             "MAX_DEVICE_SYNC_EXCEEDED",
+                                             None,
+                                             "devices %s" % (pp.pformat(
+                                                          sync_devices_list)))
                             self.sync_devices.clear()
                             self.sync_devices_attempts = 0
                         else:
@@ -322,6 +351,13 @@ class RoutingServiceHelper(object):
                                    (self.sync_devices_attempts,
                                    cfg.CONF.cfg_agent.max_device_sync_attempts,
                                    pp.pformat(self.sync_devices)))
+
+                            self.cfg_agent.cfg_agent_debug.add_agent_txn(
+                                             "cfg_agent",
+                                             "DEVICE_SYNC_RETRY",
+                                             None,
+                                             "devices %s" % (pp.pformat(
+                                                          sync_devices_list)))
 
                     self.cfg_agent.cfg_agent_debug.add_agent_txn("cfg_agent",
                           "DEVICE_SYNC_END",
@@ -930,10 +966,20 @@ class RoutingServiceHelper(object):
     def _floating_ip_added(self, ri, ex_gw_port, floating_ip, fixed_ip):
         driver = self.driver_manager.get_driver(ri.id)
         driver.floating_ip_added(ri, ex_gw_port, floating_ip, fixed_ip)
+        self.cfg_agent.cfg_agent_debug.add_floating_ip_txn(floating_ip,
+                                                  "FIP_ADD",
+                                                  self.context.request_id,
+                                                  comment="Fix-IP:%s" % (
+                                                      fixed_ip))
 
     def _floating_ip_removed(self, ri, ex_gw_port, floating_ip, fixed_ip):
         driver = self.driver_manager.get_driver(ri.id)
         driver.floating_ip_removed(ri, ex_gw_port, floating_ip, fixed_ip)
+        self.cfg_agent.cfg_agent_debug.add_floating_ip_txn(floating_ip,
+                                                  "FIP_RM",
+                                                  self.context.request_id,
+                                                  comment="Fix-IP:%s" % (
+                                                      fixed_ip))
 
     def _routes_updated(self, ri):
         """Update the state of routes in the router.

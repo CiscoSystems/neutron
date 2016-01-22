@@ -32,6 +32,39 @@ class CfgAgentDebug(base.BaseTestCase):
     def tearDown(self):
         super(CfgAgentDebug, self).tearDown()
 
+    def test_fip_txns(self):
+
+        cfg.CONF.set_override('enable_cfg_agent_debug', True, 'cfg_agent')
+        cfg.CONF.set_override('max_parent_records', 2, 'cfg_agent')
+        cfg.CONF.set_override('max_child_records', 2, 'cfg_agent')
+
+        fip_template = "172.1.1.%d"
+        fixed_ip_template = "Fixed IP 192.168.1.%d"
+
+        for i in xrange(0, 10):
+            fip = fip_template % (i)
+            fixed_ip = fixed_ip_template % (i)
+
+            self.cfg_agent_debug.add_floating_ip_txn(fip,
+                                                     "FIP_ADD",
+                                                     None,
+                                                     comment=fixed_ip)
+            self.cfg_agent_debug.add_floating_ip_txn(fip,
+                                                     "FIP_RM",
+                                                     None,
+                                                     comment=fixed_ip)
+            self.cfg_agent_debug.add_floating_ip_txn(fip,
+                                                     "FIP_ADD",
+                                                     None,
+                                                     comment=fixed_ip)
+
+        print(self.cfg_agent_debug.get_all_fip_txns_strfmt())
+
+        expected_floating_ips = ['172.1.1.8', '172.1.1.9']
+
+        self.assertEqual(expected_floating_ips,
+                         self.cfg_agent_debug.floating_ips.keys())
+
     def test_process_plugin_routers_data(self):
         """
         In this test, 101 parent records and 1 child record

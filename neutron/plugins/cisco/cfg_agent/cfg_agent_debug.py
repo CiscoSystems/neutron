@@ -65,6 +65,9 @@ class CfgAgentDebug(object):
         # a lookup table of transactions/events pertaining to a hosting-device
         self.hosting_devices = OrderedDict()
 
+        # a table to track floating ip txns
+        self.floating_ips = OrderedDict()
+
     def __repr__(self):
         ret_val = {'router_txns': self.routers,
                    'total_router_txns': self._get_total_txn_count(),
@@ -106,6 +109,33 @@ class CfgAgentDebug(object):
     def add_request(self, request_id):
         self.requests[request_id] = {'time': datetime.datetime.strftime(
                        datetime.datetime.now(), format='%Y-%m-%d %H:%M:%S.%f')}
+
+    def add_floating_ip_txn(self, floating_ip, txn_type, request_id=None,
+                            comment=None):
+        if not cfg.CONF.cfg_agent.enable_cfg_agent_debug:
+            return
+
+        if floating_ip not in self.floating_ips:
+
+            popped_floating_ip_key, popped_floating_ip_txns = \
+                CfgAgentDebug._enforce_parent_record_constraints(
+                                                            self.floating_ips)
+
+            if (popped_floating_ip_key is not None and
+                popped_floating_ip_txns is not None):
+                LOG.debug("Popped key %s, val = %s" % (popped_floating_ip_key,
+                                      pprint.pformat(popped_floating_ip_txns)))
+            self.floating_ips[floating_ip] = []
+
+        txn_record = {'time': datetime.datetime.strftime(
+                       datetime.datetime.now(), format='%Y-%m-%d %H:%M:%S.%f'),
+                      'request_id': request_id,
+                      'txn_type': txn_type,
+                      'comment': comment}
+
+        CfgAgentDebug._add_child_record(self.floating_ips,
+                                        floating_ip,
+                                        txn_record)
 
     def add_router_txn(self, router_id, txn_type, request_id=None,
                        comment=None):
@@ -163,6 +193,28 @@ class CfgAgentDebug(object):
         CfgAgentDebug._add_child_record(self.cfg_agent_txns,
                                         agent_id,
                                         agent_txn_record)
+
+    def get_floating_ip_txns_strfmt(self, floating_ip):
+
+        fip_txns_buffer = None
+
+        if floating_ip in self.floating_ips:
+            table = prettytable.PrettyTable(["time", "request_id",
+                                             "txn_type", "comment"])
+
+            fip_ip_txns = self.floating_ips[floating_ip]
+
+            for fip_txn in fip_ip_txns:
+                table.add_row([fip_txn['time'],
+                               fip_txn['request_id'],
+                               fip_txn['txn_type'],
+                               fip_txn['comment']])
+
+            fip_txns_buffer = "floating_ip:%s\n%s" % (
+                                                floating_ip,
+                                                table.get_string())
+
+        return fip_txns_buffer
 
     def get_agent_txns_strfmt(self, agent_id):
 
@@ -227,6 +279,18 @@ class CfgAgentDebug(object):
                 self.get_agent_txns_strfmt(agent_id))
 
         return all_agent_txns
+
+    def get_all_fip_txns_strfmt(self):
+        """
+        returns all router txn records for all router-ids
+        """
+        all_fip_txns = ''
+        for floating_ip in self.floating_ips:
+
+            all_fip_txns += "\n%s\n" % (
+                                 self.get_floating_ip_txns_strfmt(floating_ip))
+
+        return all_fip_txns
 
     def _get_total_txn_count(self):
 
