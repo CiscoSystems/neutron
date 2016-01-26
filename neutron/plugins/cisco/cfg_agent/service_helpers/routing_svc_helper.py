@@ -622,9 +622,10 @@ class RoutingServiceHelper(object):
                         _LE("ncclient Unexpected session close %s"), e)
                     if not self._dev_status.is_hosting_device_reachable(
                         r['hosting_device']):
-                        LOG.debug("Lost connectivity to Hosting Device %s",
-                                  r['hosting_device']['id'])
-                        # rely on heartbeat to schedule resync
+                        LOG.debug("Lost connectivity to Hosting Device %s" % (
+                                  r['hosting_device']['id']))
+                        # Will rely on heartbeat to detect hd state
+                        # and schedule resync when hd comes back
                     else:
                         # retry the router update on the next pass
                         self.updated_routers.add(r['id'])
@@ -922,7 +923,8 @@ class RoutingServiceHelper(object):
             if not self._dev_status.is_hosting_device_reachable(hd):
                 LOG.debug("Lost connectivity to Hosting Device"
                           "%s" % (hd['id']))
-                # rely on heartbeat to schedule resync
+                # rely on heartbeat to detect HD state
+                # and schedule resync when the device comes back
             else:
                 # retry the router removal on the next pass
                 self.removed_routers.add(router_id)
