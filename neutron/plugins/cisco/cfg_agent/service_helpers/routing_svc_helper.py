@@ -35,7 +35,7 @@ from neutron.plugins.cisco.cfg_agent import device_status
 from neutron.plugins.cisco.common import cisco_constants as c_constants
 from neutron.plugins.cisco.extensions import ha
 from neutron.plugins.cisco.extensions import routerrole
-
+from ncclient.transport.errors import errors ncc_errors
 LOG = logging.getLogger(__name__)
 
 
@@ -187,7 +187,7 @@ class RoutingServiceHelper(object):
         LOG.debug('Got router deleted notification for %s', routers)
         self.removed_routers.update(routers)
         self.cfg_agent.cfg_agent_debug.add_agent_txn("cfg_agent",
-                          "ROUTERS_DELETED",
+                          "RTRS_DELETED",
                           None,
                           "routers:%s" % (pp.pformat(routers)))
 
@@ -314,9 +314,9 @@ class RoutingServiceHelper(object):
                         self._cleanup_invalid_cfg(fetched_routers)
 
                         routers.extend(fetched_routers)
+                        self.sync_devices.clear()
                         LOG.debug("[sync_devices] %s finished",
                                   sync_devices_list)
-                        self.sync_devices.clear()
 
                     else:
                         # If the initial attempt to sync a device
@@ -617,6 +617,24 @@ class RoutingServiceHelper(object):
                     ri = self.router_info[r['id']]
                     ri.router = r
                     self._process_router(ri)
+                except ncc_errors.SessionCloseError as e:
+                    LOG.exception(
+                        _LE("ncclient Unexpected session close %s"), e)
+                    if not self._dev_status.is_hosting_device_reachable(
+                        device_id):
+                        LOG.info(_LI("Lost connectivity to Hosting Device"
+                                     " %(id)s", {'id': device_id}))
+                        # rely on heartbeat to schedule resync
+                    else:
+                        # retry the router update on the next pass
+                        self.updated_routers.add(r['id'])
+                        self.cfg_agent.cfg_agent_debug.add_agent_txn(
+                            "cfg_agent",
+                            "RETRY_RTR_UPDATE",
+                            None,
+                            "router:%s" % (r['id']))
+
+                    continue
                 except KeyError as e:
                     LOG.exception(_LE("Key Error, missing key: %s"), e)
                     self.updated_routers.add(r['id'])
@@ -637,6 +655,10 @@ class RoutingServiceHelper(object):
             LOG.exception(_LE("Exception in processing routers on device:%s"),
                           device_id)
             self.sync_devices.add(device_id)
+            self.cfg_agent.cfg_agent_debug.add_agent_txn("cfg_agent",
+                            "ENQ DEVICE_SYNC",
+                            None,
+                            "device:%s" % (device_id))
 
     def _send_update_port_statuses(self, port_ids, status):
         """Sends update notifications to set the operational status of the
@@ -894,6 +916,23 @@ class RoutingServiceHelper(object):
             # end up there too if exception was thrown earlier inside
             # `_process_router()`
             self.updated_routers.discard(router_id)
+        except ncc_errors.SessionCloseError as e:
+            LOG.exception(_LE("ncclient Unexpected session close %s"
+                              " while attempting to remove router"), e)
+            if not self._dev_status.is_hosting_device_reachable(device_id):
+                LOG.info(_LI("Lost connectivity to Hosting Device"
+                             " %(id)s", {'id': device_id}))
+                # rely on heartbeat to schedule resync
+            else:
+                # retry the router removal on the next pass
+                self.removed_routers.add(r['id'])
+                LOG.debug("Interim connectivity lost to hosting device %s, "
+                          "enqueuing router %s in removed_routers set" % (
+                          pp.pformat(hd), router_id))
+                self.cfg_agent.cfg_agent_debug.add_agent_txn("cfg_agent",
+                          "RETRY_RTR_DELETED",
+                          None,
+                          "router:%s" % (router_id))
 
     def _internal_network_added(self, ri, port, ex_gw_port):
         driver = self.driver_manager.get_driver(ri.id)
