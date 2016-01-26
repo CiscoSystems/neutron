@@ -35,7 +35,7 @@ from neutron.plugins.cisco.cfg_agent import device_status
 from neutron.plugins.cisco.common import cisco_constants as c_constants
 from neutron.plugins.cisco.extensions import ha
 from neutron.plugins.cisco.extensions import routerrole
-from ncclient.transport.errors import errors ncc_errors
+from ncclient.transport import errors as ncc_errors
 LOG = logging.getLogger(__name__)
 
 
@@ -621,9 +621,9 @@ class RoutingServiceHelper(object):
                     LOG.exception(
                         _LE("ncclient Unexpected session close %s"), e)
                     if not self._dev_status.is_hosting_device_reachable(
-                        device_id):
-                        LOG.info(_LI("Lost connectivity to Hosting Device"
-                                     " %(id)s", {'id': device_id}))
+                        r['hosting_device']):
+                        LOG.debug("Lost connectivity to Hosting Device %s",
+                                  r['hosting_device']['id'])
                         # rely on heartbeat to schedule resync
                     else:
                         # retry the router update on the next pass
@@ -919,16 +919,16 @@ class RoutingServiceHelper(object):
         except ncc_errors.SessionCloseError as e:
             LOG.exception(_LE("ncclient Unexpected session close %s"
                               " while attempting to remove router"), e)
-            if not self._dev_status.is_hosting_device_reachable(device_id):
-                LOG.info(_LI("Lost connectivity to Hosting Device"
-                             " %(id)s", {'id': device_id}))
+            if not self._dev_status.is_hosting_device_reachable(hd):
+                LOG.debug("Lost connectivity to Hosting Device"
+                          "%s" % (hd['id']))
                 # rely on heartbeat to schedule resync
             else:
                 # retry the router removal on the next pass
-                self.removed_routers.add(r['id'])
+                self.removed_routers.add(router_id)
                 LOG.debug("Interim connectivity lost to hosting device %s, "
-                          "enqueuing router %s in removed_routers set" % (
-                          pp.pformat(hd), router_id))
+                          "enqueuing router %s in removed_routers set" %
+                          (pp.pformat(hd), router_id))
                 self.cfg_agent.cfg_agent_debug.add_agent_txn("cfg_agent",
                           "RETRY_RTR_DELETED",
                           None,
