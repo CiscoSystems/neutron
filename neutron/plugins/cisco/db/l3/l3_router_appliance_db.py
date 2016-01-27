@@ -373,7 +373,7 @@ class L3RouterApplianceDBMixin(extraroute_db.ExtraRoute_dbonly_mixin):
             if ni['notifier']:
                 ni['notifier'].routers_updated(context, ni['routers'],
                                                l3_method)
-        mapping = {'add': 'create', 'remove': 'delete'}
+        mapping = {'add': 'create', 'remove': 'delete', 'modify': 'update'}
         notifier = n_rpc.get_notifier('network')
         router_event = 'router.interface.%s' % mapping[action]
         notifier.info(context, router_event,
@@ -769,6 +769,28 @@ class L3RouterApplianceDBMixin(extraroute_db.ExtraRoute_dbonly_mixin):
                     valid_router_ids.extend(router_id_list)
         self.notify_routers_updated(e_context, valid_router_ids, operation)
 
+    def _notify_port_update_routers(self, context, router_id, port,
+                                    new_port_data, operation):
+
+        try:
+            r_hd_binding_db = self._get_router_binding_info(context.elevated(),
+                                                            router_id)
+        except RouterBindingInfoError:
+            return
+        is_ha = (utils.is_extension_supported(self, ha.HA_ALIAS) and
+                 r_hd_binding_db.router_type_id !=
+                 self.get_namespace_router_type_id(context))
+        if is_ha:
+            # process any HA
+            self._update_redundancy_router_interfaces(
+                context, self._make_router_dict(r_hd_binding_db.router),
+                port, new_port_data)
+        routers = [self.get_router(context, router_id)]
+        self.add_type_and_hosting_device_info(context.elevated(), routers[0])
+        info = {'id': router_id, 'port_id': port['id']}
+        self.notify_router_interface_action(context, info, routers, 'modify')
+        return info
+
     def get_router_type_id(self, context, router_id):
         r_hd_b = self._get_router_binding_info(context, router_id,
                                                load_hd_info=False)
@@ -1132,8 +1154,8 @@ class L3RouterApplianceDBMixin(extraroute_db.ExtraRoute_dbonly_mixin):
             port_db = self._core_plugin._get_port(context, port['id'])
         except n_exc.PortNotFound:
             LOG.debug('**** NO Port Info to populate hosting info for '
-                'router: %(r_id)s : Port: %(p_id)s from DB',
-                {'r_id': router_id, 'p_id': port['id']})
+                      'router: %(r_id)s : Port: %(p_id)s from DB',
+                      {'r_id': router_id, 'p_id': port['id']})
             return None, False
         h_info = port_db.hosting_info
         new_allocation = False
@@ -1275,6 +1297,32 @@ def _notify_routers_callback(resource, event, trigger, **kwargs):
                                           'disassociate_floatingips')
 
 
+def _notify_cfg_agent_port_update(resource, event, trigger, **kwargs):
+    """To be called when the port admin_state_up value is changed, i.e
+        when the specific interface on the router is enabled/disabled
+    """
+    original_port = kwargs.get('original_port')
+    updated_port = kwargs.get('port')
+    if updated_port.get('admin_state_up') is not None and \
+       original_port.get('admin_state_up') is not None and \
+       updated_port.get('admin_state_up') != \
+                        original_port.get('admin_state_up'):
+        new_port_data = {'port': {}}
+        new_port_data['port']['admin_state_up'] = \
+                      updated_port.get('admin_state_up')
+        original_device_owner = original_port.get('device_owner', '')
+        if original_device_owner.startswith('network'):
+            router_id = original_port.get('device_id')
+            context = kwargs.get('context')
+            l3plugin = manager.NeutronManager.get_service_plugins().get(
+                    svc_constants.L3_ROUTER_NAT)
+            if l3plugin and router_id:
+                l3plugin._notify_port_update_routers(context, router_id,
+                                                     original_port,
+                                                     new_port_data,
+                                                     'update_port_status_cfg')
+
+
 def modify_subscribe():
     # unregister the function in l3_db as it does not do what we need
     registry.unsubscribe(l3_db._notify_routers_callback, resources.PORT,
@@ -1282,6 +1330,9 @@ def modify_subscribe():
     # register our own version
     registry.subscribe(
         _notify_routers_callback, resources.PORT, events.AFTER_DELETE)
+    # register for updates on a port
+    registry.subscribe(_notify_cfg_agent_port_update, resources.PORT,
+                       events.AFTER_UPDATE)
 
 
 modify_subscribe()
