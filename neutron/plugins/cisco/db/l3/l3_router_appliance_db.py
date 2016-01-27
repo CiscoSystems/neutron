@@ -1304,8 +1304,7 @@ def _notify_cfg_agent_port_update(resource, event, trigger, **kwargs):
     """
     original_port = kwargs.get('original_port')
     updated_port = kwargs.get('port')
-    if updated_port.get('admin_state_up') is not None and \
-       original_port.get('admin_state_up') is not None and \
+    if updated_port is not None and original_port is not None and \
        updated_port.get('admin_state_up') != \
                         original_port.get('admin_state_up'):
         new_port_data = {'port': {}}
