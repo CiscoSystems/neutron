@@ -1177,9 +1177,9 @@ class L3RouterApplianceDBMixin(extraroute_db.ExtraRoute_dbonly_mixin):
                 hosting_port_id=alloc['allocated_port_id'],
                 segmentation_id=alloc['allocated_vlan'])
             context.session.add(h_info_db)
-            context.session.expire(port_db)
-        # allocation succeeded so establish connectivity for logical port
+        context.session.expire(port_db)
         context.session.expire(h_info_db)
+        # allocation succeeded so establish connectivity for logical port
         plugging_driver.setup_logical_port_connectivity(context, port_db,
                                                         hosting_device_id)
         return h_info_db
