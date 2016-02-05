@@ -16,6 +16,7 @@ from functools import wraps
 import imp
 import time
 
+from ncclient.transport import errors as ncc_exc
 from oslo_log import log as logging
 
 from neutron.common import exceptions as nexception
@@ -107,6 +108,8 @@ def mock_ncclient():
         def edit_config(config, format='xml', target='candidate',
                         default_operation=None, test_option=None,
                         error_option=None):
+            if not _fake_is_pingable(rc_emul.host_ip):
+                raise ncc_exc.SSHError('SSH error')
             rc_emul.edit_config(config)
             print(rc_emul.get_config())
             return ok_xml_obj
@@ -119,6 +122,8 @@ def mock_ncclient():
     def _get_fake_get_config(simulator):
 
         def get_running_config(source):
+            if not _fake_is_pingable(rc_emul.host_ip):
+                raise ncc_exc.SSHError('SSH error')
             head = ('<?xml version="1.0" encoding="UTF-8"?><rpc-reply '
                     'message-id="urn:uuid:ec8bab72-a500-11e5-a92f'
                     '-74a2e6d55908" xmlns="urn:ietf:params:xml:ns:netconf:'
