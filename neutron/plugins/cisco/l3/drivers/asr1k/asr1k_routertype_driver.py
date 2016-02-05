@@ -13,6 +13,7 @@
 #    under the License.
 
 from oslo_config import cfg
+from sqlalchemy.orm import exc
 
 from neutron.common import constants as l3_constants
 from neutron.extensions import l3
@@ -29,6 +30,8 @@ from neutron.plugins.cisco.extensions import routertypeawarescheduler
 from neutron.plugins.cisco.l3 import drivers
 from neutron.plugins.common import constants
 
+from oslo_log import log as logging
+LOG = logging.getLogger(__name__)
 
 HOSTING_DEVICE_ATTR = routerhostingdevice.HOSTING_DEVICE_ATTR
 ROUTER_ROLE_GLOBAL = cisco_constants.ROUTER_ROLE_GLOBAL
@@ -202,9 +205,12 @@ class ASR1kL3RouterDriver(drivers.L3RouterBaseDriver):
             global_routers = self._l3_plugin.get_routers(context,
                                                          filters=filters)
             if global_routers:
-                # can remove the global router as it will no longer be used
-                self._l3_plugin.delete_router(
-                    context, global_routers[0]['id'], unschedule=False)
+                try:
+                    # can remove the global router as it will no longer be used
+                    self._l3_plugin.delete_router(
+                        context, global_routers[0]['id'], unschedule=False)
+                except (exc.ObjectDeletedError, l3.RouterNotFound) as e:
+                    LOG.warn(e)
                 self._conditionally_remove_logical_global_router(context,
                                                                  router)
 
@@ -288,8 +294,11 @@ class ASR1kL3RouterDriver(drivers.L3RouterBaseDriver):
             # can also be deleted.
             # We use parent class method as no special operations beyond what
             # the base implemenation does are needed for logical global router
-            super(L3RouterApplianceDBMixin, self._l3_plugin).delete_router(
-                context, log_global_routers[0]['id'])
+            try:
+                super(L3RouterApplianceDBMixin, self._l3_plugin).delete_router(
+                    context, log_global_routers[0]['id'])
+            except (exc.ObjectDeletedError, l3.RouterNotFound) as e:
+                LOG.warn(e)
         else:
             self._update_ha_redundancy_level(context, log_global_routers[0],
                                              -1)
