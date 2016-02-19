@@ -72,7 +72,7 @@ class TestHTParser(base.BaseTestCase):
         super(TestHTParser, self).tearDown()
 
     def _execute(self, function_name, linespec):
-        return getattr(HTParser(self.cfg),function_name)(linespec)
+        return getattr(HTParser(self.cfg), function_name)(linespec)
 
     def test_find_lines1(self):
         linespec = "^interface TenGigabitEthernet0/0/0"
@@ -204,7 +204,7 @@ class TestHTParser(base.BaseTestCase):
         exp = ['interface Serial1/0', ' no ip address']
         parse = HTParser(self.cfg)
         act = [obj for obj in parse.find_objects(linespec)
-                   if obj.re_search_children(child_linespec)]
+               if obj.re_search_children(child_linespec)]
         self.assertEqual(1, len(act))
         self.assertEqual(exp, act[0].str_list())
 
@@ -216,7 +216,7 @@ class TestHTParser(base.BaseTestCase):
                ' dummy-input2']
         parse = HTParser(self.cfg)
         act = [obj for obj in parse.find_objects(linespec)
-                   if obj.re_search_children(child_linespec)]
+               if obj.re_search_children(child_linespec)]
         self.assertEqual(1, len(act))
         self.assertEqual(exp, act[0].str_list())
 
@@ -227,7 +227,6 @@ class TestHTParser(base.BaseTestCase):
         exp = 'Port-channel11.2033'
         parse = HTParser(self.cfg)
         act = [obj for obj in parse.find_objects(linespec)
-                   if obj.re_search_children(child_linespec)]
+               if obj.re_search_children(child_linespec)]
         self.assertEqual(1, len(act))
         self.assertEqual(exp, act[0].re_match(match_regex))
-

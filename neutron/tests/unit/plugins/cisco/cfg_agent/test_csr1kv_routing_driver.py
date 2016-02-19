@@ -24,7 +24,6 @@ from neutron.tests import base
 from neutron.plugins.cisco.cfg_agent.device_drivers.csr1kv import (
     cisco_csr1kv_snippets as snippets)
 sys.modules['ncclient'] = mock.MagicMock()
-sys.modules['ciscoconfparse'] = mock.MagicMock()
 from neutron.plugins.cisco.cfg_agent.device_drivers.csr1kv import (
     csr1kv_routing_driver as csr_driver)
 from neutron.plugins.cisco.cfg_agent.service_helpers import (

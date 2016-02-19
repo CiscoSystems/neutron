@@ -146,4 +146,3 @@ class HTParser(object):
             res.append(parent.line)
             res.extend([child.line for child in parent.children])
         return res
-

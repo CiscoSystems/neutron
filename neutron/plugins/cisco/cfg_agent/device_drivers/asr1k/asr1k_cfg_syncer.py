@@ -12,7 +12,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import ciscoconfparse
 import netaddr
 from oslo_config import cfg
 import pprint as pp
@@ -20,6 +19,7 @@ import pprint as pp
 from neutron.common import constants
 from neutron.i18n import _LI
 from neutron.plugins.cisco.common import cisco_constants
+from neutron.plugins.cisco.common.htparser import HTParser
 from neutron.plugins.cisco.extensions import ha
 from neutron.plugins.cisco.extensions import routerrole
 
@@ -276,7 +276,7 @@ class ConfigSyncer(object):
                 LOG.info(intf_info)
 
         running_cfg = self.get_running_config(conn)
-        parsed_cfg = ciscoconfparse.CiscoConfParse(running_cfg)
+        parsed_cfg = HTParser(running_cfg)
 
         invalid_cfg = []
 

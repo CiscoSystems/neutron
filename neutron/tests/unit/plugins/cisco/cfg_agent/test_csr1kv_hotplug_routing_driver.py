@@ -25,7 +25,6 @@ from neutron.plugins.cisco.cfg_agent.device_drivers.csr1kv import (
 from oslo_utils import uuidutils
 
 sys.modules['ncclient'] = mock.MagicMock()
-sys.modules['ciscoconfparse'] = mock.MagicMock()
 
 _uuid = uuidutils.generate_uuid
 FAKE_ID = _uuid()
