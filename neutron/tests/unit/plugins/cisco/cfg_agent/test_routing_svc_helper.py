@@ -19,6 +19,8 @@ from oslo_config import cfg
 import oslo_messaging
 from oslo_utils import uuidutils
 
+from ncclient.transport import errors as ncc_errors
+
 from neutron.common import config as base_config
 from neutron.common import constants as l3_constants
 from neutron.tests import base
@@ -29,7 +31,6 @@ from neutron.plugins.cisco.cfg_agent.service_helpers import (
     routing_svc_helper)
 from neutron.plugins.cisco.extensions import ha
 from neutron.plugins.cisco.extensions import routerrole
-
 
 _uuid = uuidutils.generate_uuid
 HOST = 'myhost'
@@ -202,6 +203,21 @@ class TestBasicRoutingOperations(base.BaseTestCase):
         router, ports = prepare_router_data()
         ri = routing_svc_helper.RouterInfo(router['id'], router)
         self.assertRaises(cfg_exceptions.CSR1kvConfigException,
+                          self.routing_helper._process_router, ri)
+
+    def test_process_router_throw_session_close(self):
+        # snip_name = 'CREATE_SUBINTERFACE'
+        # e_type = 'Fake error'
+        # e_tag = 'Fake error tag'
+        # confstr = 'Fake conf str'
+        # params = {'snippet': snip_name, 'type': e_type, 'tag': e_tag,
+        #          'confstr': confstr, 'dev_id': 'FAKE_ID', 'ip': 'FAKE_IP'}
+        params = {'in_buf': ''}
+        self.routing_helper._internal_network_added.side_effect = (
+            ncc_errors.SessionCloseError(**params))
+        router, ports = prepare_router_data()
+        ri = routing_svc_helper.RouterInfo(router['id'], router)
+        self.assertRaises(ncc_errors.SessionCloseError,
                           self.routing_helper._process_router, ri)
 
     def test_process_router(self):

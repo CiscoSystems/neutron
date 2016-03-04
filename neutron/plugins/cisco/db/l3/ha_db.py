@@ -823,7 +823,7 @@ class HA_db_mixin(object):
         if hag is None:
             LOG.debug('Failed to fetch the HA group info for for router: '
                       '%(r_id)s and subnet: %(s_id)s. Giving up. No HA '
-                      'info will be added to the router\'s port: %s.',
+                      'info will be added to the router\'s port: %(p_id)s.',
                       {'r_id': router_id, 's_id': subnet_id,
                        'p_id': port['id']})
             # we leave it to the L3 config agent to handle this
