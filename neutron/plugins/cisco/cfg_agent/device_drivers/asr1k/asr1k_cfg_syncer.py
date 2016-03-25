@@ -167,42 +167,130 @@ def is_port_v6(port):
         return False
 
 
-def clean_snat(cfg_sync_ctx):
-    LOG.info(_LI("clean_snat invoked"))
+class Command(object):
+    """
+    Base check command class
+    """
+
+    CMD_SUCCESS = "SUCCESS"
+    CMD_CONTINUE = "CONTINUE"
+    CMD_FAIL = "FAIL"
+
+    def __init__(self, cmd_context, name=None):
+        self.cmd_context = cmd_context
+        self.name = name
+        self.status = None
+
+    def _assert_keys_in_cmd_context(self, expected_ctx_keys):
+        """
+        This method asserts that ALL keys present in the list,
+        expected_ctx_keys are present in self.cmd_context
+        """
+        ret_val = True
+
+        if expected_ctx_keys is not None and self.cmd_context is not None:
+            for key in expected_ctx_keys:
+                if key not in self.cmd_context:
+                    LOG.debug("key %s not found in cmd_context, failed check")
+                    ret_val = False
+                    break
+
+        return ret_val
+
+    def execute(self):
+        return Command.CMD_SUCCESS
 
 
-def clean_nat_pool_overload(cfg_sync_ctx):
-    LOG.info(_LI("clean_nat_pool_overload invoked"))
+class MacroCommand(Command):
+    """
+    Composite command
+    """
+
+    def __init__(self, cmd_context, name):
+        super(MacroCommand, self).__init__(cmd_context, name)
+        self.commands = []
+
+    def add_command(self, cmd):
+        self.commands.append(cmd)
+
+    def set_commands(self, cmds):
+        self.commands = cmds
+
+    def execute(self):
+        """
+        if any sub-command in the macro-command fails,
+        halt.
+        """
+        cmd_status = Command.CMD_SUCCESS
+        for cmd in self.commands:
+            exec_cmd_status = cmd.execute()
+
+            if (exec_cmd_status == Command.CMD_FAIL):
+                cmd_status = Command.FAIL
+                break
+
+        return cmd_status
 
 
-def clean_nat_pool(cfg_sync_ctx):
-    LOG.info(_LI("clean_nat_pool invoked"))
+class DeleteLegacySNATCmd(Command):
+
+    """
+    This command removes any old legacy format SNAT rules found
+    on the ASR
+    """
+    SNAT_REGEX_OLD = ("ip nat inside source static"
+                      " (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"
+                      " (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}) vrf " +
+                      NROUTER_REGEX +
+                      " redundancy neutron-hsrp-grp-(\d+)-(\d+)")
+
+    def __init__(self, cmd_context=None, name="DeleteLegacySNATCmd"):
+        super(DeleteLegacySNATCmd, self).__init__(cmd_context, name)
+
+    def execute(self):
+        LOG.debug("DeleteLegacySNATCmd execute")
+        if (self._assert_keys_in_cmd_context(['parsed_cfg',
+                                              'invalid_cfg',
+                                              'config_syncer'])):
+
+            # check if any old-style NAT rules are present and
+            # queue them up for deletion
+            parsed_cfg = self.cmd_context['parsed_cfg']
+            invalid_cfg = self.cmd_context['invalid_cfg']
+            delete_fip_list = []
+
+            floating_ip_old_rules = \
+                parsed_cfg.find_objects(DeleteLegacySNATCmd.SNAT_REGEX_OLD)
+
+            for snat_rule in floating_ip_old_rules:
+                LOG.info(_LI("\n Rule is old format,"
+                             " deleting: %(snat_rule)s") %
+                         {'snat_rule': snat_rule.text})
+
+                delete_fip_list.append(snat_rule.text)
+
+            invalid_cfg += delete_fip_list
+            cmd_status = Command.CMD_SUCCESS
+        else:
+            cmd_status = Command.CMD_CONTINUE
+
+        return cmd_status
 
 
-def clean_default_route(cfg_sync_ctx):
-    LOG.info(_LI("clean_default_route invoked"))
+class CleanSNATCommand(MacroCommand):
+    """
+    Macro CleanSNATCommand
+    """
 
+    def __init__(self, cmd_context=None,
+                 is_multi_region_enabled=False):
 
-def clean_acls(cfg_sync_ctx):
-    LOG.info(_LI("clean_acls invoked"))
+        super(CleanSNATCommand, self).__init__(cmd_context, "CleanSNATCommand")
 
-
-def clean_interfaces(cfg_sync_ctx):
-    LOG.info(_LI("clean_interfaces invoked"))
-
-
-def clean_vrfs(cfg_sync_ctx):
-    LOG.info(_LI("clean_vrfs invoked"))
-
-
-INVALID_CFG_CHECK = [
-    clean_snat,
-    clean_nat_pool_overload,
-    clean_default_route,
-    clean_acls,
-    clean_interfaces,
-    clean_vrfs
-]
+        if (is_multi_region_enabled):
+            self.set_commands([DeleteLegacySNATCmd(cmd_context)])
+        else:
+            self.set_commands([DeleteLegacySNATCmd(cmd_context)])
 
 
 class ConfigSyncer2(object):
@@ -414,12 +502,17 @@ class ConfigSyncer2(object):
                         'conn': conn,
                         'cfg_syncer': self}
 
-        for check_func in INVALID_CFG_CHECK:
-            check_func(cfg_sync_ctx)
+        commands = [CleanSNATCommand(cfg_sync_ctx)]
 
+        for command in commands:
+            command.execute()
+
+        return invalid_cfg
+
+    """
     def clean_snat(self, conn, parsed_cfg):
         pass
-
+    """
 
 
 class ConfigSyncer(object):
