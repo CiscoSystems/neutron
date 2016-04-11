@@ -191,7 +191,23 @@ class Command(object):
         if expected_ctx_keys is not None and self.cmd_context is not None:
             for key in expected_ctx_keys:
                 if key not in self.cmd_context:
-                    LOG.debug("key %s not found in cmd_context, failed check")
+                    LOG.debug("key %s not found in"
+                              " cmd_context, failed check" % (key))
+                    ret_val = False
+                    break
+
+        return ret_val
+
+    @staticmethod
+    def assert_keys_in_dict(expected_keys, target_dict):
+
+        ret_val = True
+
+        if (expected_keys is not None and target_dict is not None):
+            for key in expected_keys:
+                if key not in target_dict:
+                    LOG.debug("key %s not found in cmd_context,"
+                              " failed check" % (key))
                     ret_val = False
                     break
 
@@ -232,11 +248,13 @@ class MacroCommand(Command):
         return cmd_status
 
 
-class DeleteLegacySNATCmd(Command):
+class DeleteLegacySNATCmd(MacroCommand):
 
     """
     This command removes any old legacy format SNAT rules found
     on the ASR
+
+    Delete any entries with old style 'hsrp-grp-x-y' grp name
     """
     SNAT_REGEX_OLD = ("ip nat inside source static"
                       " (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"
@@ -248,7 +266,10 @@ class DeleteLegacySNATCmd(Command):
         super(DeleteLegacySNATCmd, self).__init__(cmd_context, name)
 
     def execute(self):
-        LOG.debug("DeleteLegacySNATCmd execute")
+        """
+        overloaded execute
+        """
+        LOG.info("DeleteLegacySNATCmd execute")
         if (self._assert_keys_in_cmd_context(['parsed_cfg',
                                               'invalid_cfg',
                                               'config_syncer'])):
@@ -277,20 +298,325 @@ class DeleteLegacySNATCmd(Command):
         return cmd_status
 
 
-class CleanSNATCommand(MacroCommand):
+class ParseSNATCmd(Command):
     """
-    Macro CleanSNATCommand
+    This command encapsulates the logic for parsing the SNAT attributes
+    from an individual SNAT running-config line
+    outputs a dictionary to 'parsed_snat'
+    """
+    def __init__(self, cmd_context=None):
+        super(ParseSNATCmd, self).__init__(cmd_context, "ParseSNATCmd")
+        self.snat_regex = SNAT_REGEX
+
+    def execute(self):
+        LOG.info("ParseSNATCmd execute")
+
+        if (self._assert_keys_in_cmd_context(['parsed_cfg',
+                                              'invalid_cfg',
+                                              'cfg_syncer',
+                                              'current_snat_rule'])):
+            LOG.debug("ParseSNATCmd precondition met")
+
+            current_snat_rule = self.cmd_context['current_snat_rule']
+
+            match_obj = re.match(self.snat_regex, current_snat_rule.text)
+
+            inner_ip, outer_ip, router_id, hsrp_num, segment_id = (
+                match_obj.group(1, 2, 3, 4, 5))
+
+            segment_id = int(segment_id)
+            hsrp_num = int(hsrp_num)
+
+            current_parsed_snat_rule = {'inner_ip': inner_ip,
+                                        'outer_ip': outer_ip,
+                                        'router_id': router_id,
+                                        'hsrp_num': hsrp_num,
+                                        'segment_id': segment_id}
+            self.cmd_context['current_parsed_snat_rule'] = \
+                current_parsed_snat_rule
+
+            return Command.CMD_SUCCESS
+        else:
+            return Command.CMD_FAIL
+
+
+class ParseSNATMultiRegionCmd(Command):
+    """
+    This command encapsulates the logic for parsing the SNAT attributes
+    from an individual SNAT running-config line
+    outputs a dictionary to 'parsed_snat'
+    """
+    def __init__(self, cmd_context=None):
+        super(ParseSNATMultiRegionCmd, self).__init__(cmd_context,
+                                                     "ParseSNATMultiRegionCmd")
+        self.snat_regex = SNAT_MULTI_REGION_REGEX
+
+    def execute(self):
+        LOG.info("ParseSNATMultiRegionCmd execute")
+
+        if (self._assert_keys_in_cmd_context(['parsed_cfg',
+                                              'invalid_cfg',
+                                              'config_syncer',
+                                              'current_snat_rule'])):
+            LOG.debug("ParseSNATMultiRegionCmd precondition met")
+
+            current_snat_rule = self.cmd_context['current_snat_rule']
+            match_obj = re.match(self.snat_regex, current_snat_rule.text)
+
+            inner_ip, outer_ip, router_id, region_id, hsrp_num, segment_id = (
+                match_obj.group(1, 2, 3, 4, 5, 6))
+
+            segment_id = int(segment_id)
+            hsrp_num = int(hsrp_num)
+
+            current_parsed_snat_rule = {'inner_ip': inner_ip,
+                                        'outer_ip': outer_ip,
+                                        'router_id': router_id,
+                                        'region_id': region_id,
+                                        'hsrp_num': hsrp_num,
+                                        'segment_id': segment_id}
+            self.cmd_context['current_parsed_snat_rule'] = \
+                current_parsed_snat_rule
+            return Command.CMD_SUCCESS
+        else:
+            return Command.CMD_FAIL
+
+
+class CheckSNATRegionIDCmd(Command):
+    """
+    This command encapsulates the logic for checking whether the
+    region ID embedded in the SNAT is valid or not
+
+    Expects current_parsed_snat_rule to exist in cmd_context
+    """
+    def __init__(self, cmd_context=None):
+        super(CheckSNATRegionIDCmd, self).__init__(cmd_context,
+                                                   "CheckSNATRegionIDCmd")
+
+    def execute(self):
+        LOG.info("CheckSNATRegionIDCmd execute")
+
+        if (self._assert_keys_in_cmd_context(['parsed_cfg',
+                                              'invalid_cfg',
+                                              'cfg_syncer',
+                                              'current_snat_rule',
+                                              'current_parsed_snat_rule'])):
+            LOG.debug("ParseSNATCmd precondition met")
+
+            cur_snat_rule = self.cmd_context['current_snat_rule']
+            cur_parsed_snat_rule = self.cmd_context['current_parsed_snat_rule']
+            invalid_cfg = self.cmd_context['invalid_cfg']
+
+            if 'region_id' in cur_parsed_snat_rule:
+                region_id = cur_parsed_snat_rule['region_id']
+                my_region_id = cfg.CONF.multi_region.region_id
+                other_region_ids = cfg.CONF.multi_region.other_region_ids
+
+                if region_id != my_region_id:
+                    if region_id not in other_region_ids:
+                        invalid_cfg.append(cur_snat_rule.text)
+                return Command.CMD_SUCCESS
+            else:
+                return Command.CMD_FAIL
+        else:
+            return Command.CMD_FAIL
+
+
+class CheckSNATRuleCmd(Command):
+    """
+    This command encapsulates the logic for checking whether the
+    SNAT configuration matches neutron-db
+
+    Expects current_parsed_snat_rule to exist in cmd_context
+
+     {'inner_ip': inner_ip,
+      'outer_ip': outer_ip,
+      'router_id': router_id,
+      'region_id': region_id,
+      'hsrp_num': hsrp_num,
+      'segment_id': segment_id}
+    """
+
+    def _validate_router_id(self, cur_parsed_snat_rule, cfg_syncer):
+        ret_val = Command.CMD_SUCCESS
+
+        if (cur_parsed_snat_rule is not None and cfg_syncer is not None and
+            cur_parsed_snat_rule['router_id'] in cfg_syncer.router_id_dict):
+            ret_val = Command.CMD_SUCCESS
+        else:
+            LOG.info(_LI("router %s not found for snat_rule") % (
+                     cur_parsed_snat_rule['router_id']))
+            ret_val = Command.CMD_FAIL
+
+        return ret_val
+
+    def _validate_gw_port(self, cur_parsed_snat_rule, cfg_syncer):
+        ret_val = Command.CMD_SUCCESS
+
+        router = cfg_syncer.router_id_dict(cur_parsed_snat_rule['router_id'])
+
+        if "gw_port" not in router:
+            LOG.info(_LI("router has no gw_port,"
+                         " snat is invalid"))
+            ret_val = Command.CMD_FAIL
+            return ret_val
+        else:
+            # validate hsrp and segment_id configured on gw_port
+            gw_port = router['gw_port']
+            gw_hsrp_num = int(gw_port[ha.HA_INFO]['group'])
+            gw_segment_id = int(gw_port['hosting_info']['segmentation_id'])
+
+            if cur_parsed_snat_rule['segment_id'] != gw_segment_id:
+                LOG.info(_LI("snat segment_id does not match router's"
+                         " gw segment_id, deleting"))
+                ret_val = Command.CMD_FAIL
+                return ret_val
+
+            if cur_parsed_snat_rule['hsrp_num'] != gw_hsrp_num:
+                LOG.info(_LI("snat hsrp group does not match router gateway's"
+                         " hsrp group, deleting"))
+                ret_val = Command.CMD_FAIL
+                return ret_val
+
+            if '_floatingips' not in router:
+                LOG.info(_LI("Router has no floating IPs defined,"
+                         " snat rule is invalid, deleting"))
+                ret_val = Command.CMD_FAIL
+                return ret_val
+
+            fip_match_found = False
+            for floating_ip in router['_floatingips']:
+                if ((cur_parsed_snat_rule['inner_ip'] ==
+                     floating_ip['fixed_ip_address']) and
+                    (cur_parsed_snat_rule['outer_ip'] ==
+                     floating_ip['floating_ip_address'])):
+                    fip_match_found = True
+                    break
+
+            if fip_match_found is False:
+                LOG.info(_LI("snat rule does not match defined floating IPs,"
+                         " deleting"))
+                ret_val = Command.CMD_FAIL
+                return ret_val
+
+        ret_val = Command.CMD_SUCCESS
+        return ret_val
+
+    def __init__(self, cmd_context=None):
+        super(CheckSNATRuleCmd, self).__init__(cmd_context, "CheckSNATRuleCmd")
+
+    def execute(self):
+        LOG.info("CheckSNATRuleCmd execute")
+        import pdb
+        pdb.set_trace()
+        if (self._assert_keys_in_cmd_context(['parsed_cfg',
+                                              'invalid_cfg',
+                                              'cfg_syncer',
+                                              'current_snat_rule',
+                                              'current_parsed_snat_rule'])):
+            LOG.debug("CheckSNATRuleCmd precondition met")
+
+            cur_snat_rule = self.cmd_context['current_snat_rule']
+            cur_parsed_snat_rule = self.cmd_context['current_parsed_snat_rule']
+            invalid_cfg = self.cmd_context['invalid_cfg']
+            cfg_syncer = self.cmd_context['cfg_syncer']
+
+            LOG.info(_LI("current parsed snat rule: %s") % (
+                     pp.pformat(cur_parsed_snat_rule)))
+
+            # consider putting assert_keys_in_dict to snat_checks
+            if (Command.assert_keys_in_dict(['inner_ip', 'outer_ip',
+                                             'router_id',
+                                             'hsrp_num', 'segment_id'],
+                                            cur_parsed_snat_rule)):
+
+                snat_checks = [self._validate_router_id,
+                               self._validate_gw_port]
+
+                for check in snat_checks:
+                    ret = check(cur_parsed_snat_rule, cfg_syncer)
+
+                    if (ret == Command.CMD_FAIL):
+                        return ret
+
+                return Command.CMD_SUCCESS
+            else:
+                return Command.CMD_FAIL
+        else:
+            return Command.CMD_FAIL
+
+
+class CheckSNATMacroCmd(MacroCommand):
+    """
+    This macro command checks whether the SNAT configuration
+    found in the ASR running config matches the current
+    neutron db state.
+
+    is_multi_region_enabled
+    * check multi region in each SNAT/floating ip
+
+
+
+    """
+
+    def __init__(self, cmd_context=None, is_multi_region_enabled=False):
+        super(CheckSNATMacroCmd, self).__init__(cmd_context,
+                                                "CheckSNATMacroCmd")
+
+        if (is_multi_region_enabled is True):
+            self.snat_regex = SNAT_MULTI_REGION_REGEX
+            self.commands = [ParseSNATMultiRegionCmd(cmd_context),
+                             CheckSNATRegionIDCmd(cmd_context),
+                             CheckSNATRuleCmd(cmd_context)]
+        else:
+            self.snat_regex = SNAT_REGEX
+            self.commands = [ParseSNATCmd(cmd_context),
+                             CheckSNATRuleCmd(cmd_context)]
+
+    def execute(self):
+        """
+        Overloaded execute.  In this implementation, for each parsed snat rule,
+        a list of check/sub-commands will be executed.
+        """
+        LOG.info("CheckSNATMacroCmd execute")
+        if (self._assert_keys_in_cmd_context(['parsed_cfg',
+                                              'invalid_cfg',
+                                              'cfg_syncer'])):
+
+            parsed_cfg = self.cmd_context['parsed_cfg']
+            invalid_cfg = self.cmd_context['invalid_cfg']
+            floating_ip_snats = parsed_cfg.find_objects(self.snat_regex)
+            LOG.info("floating_ip_snats = %s" % (
+                      pp.pformat(floating_ip_snats)))
+            for snat_rule in floating_ip_snats:
+                LOG.info(_LI("\nstatic nat rule: %(snat_rule)s") %
+                         {'snat_rule': snat_rule})
+                self.cmd_context['current_snat_rule'] = snat_rule
+                for sub_command in self.commands:
+                    sub_command.execute()
+
+            cmd_status = Command.CMD_SUCCESS
+        else:
+            cmd_status = Command.CMD_CONTINUE
+
+        return cmd_status
+
+
+class CleanSNATMacroCommand(MacroCommand):
+    """
+    Macro CleanSNATMacroCommand
     """
 
     def __init__(self, cmd_context=None,
                  is_multi_region_enabled=False):
 
-        super(CleanSNATCommand, self).__init__(cmd_context, "CleanSNATCommand")
-
+        super(CleanSNATMacroCommand, self).__init__(cmd_context, "CleanSNATMacroCommand")
         if (is_multi_region_enabled):
-            self.set_commands([DeleteLegacySNATCmd(cmd_context)])
+            self.set_commands([DeleteLegacySNATCmd(cmd_context),
+                               CheckSNATMacroCmd(cmd_context, True)])
         else:
-            self.set_commands([DeleteLegacySNATCmd(cmd_context)])
+            self.set_commands([DeleteLegacySNATCmd(cmd_context),
+                               CheckSNATMacroCmd(cmd_context)])
 
 
 class ConfigSyncer2(object):
@@ -502,8 +828,7 @@ class ConfigSyncer2(object):
                         'conn': conn,
                         'cfg_syncer': self}
 
-        commands = [CleanSNATCommand(cfg_sync_ctx)]
-
+        commands = [CleanSNATMacroCommand(cfg_sync_ctx)]
         for command in commands:
             command.execute()
 
